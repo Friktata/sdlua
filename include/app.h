@@ -21,7 +21,6 @@
 
 #include "../lib/miniaudio/miniaudio.h"
 
-#define APP_NAME            "SDLua"
 #define APP_ERRMSG_LEN      1024
 
 typedef struct __app        {
