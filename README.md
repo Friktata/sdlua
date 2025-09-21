@@ -4,7 +4,7 @@ SDLua is a fun little scripting engine that provides a handful of useful SDL3 bi
 
 You can create SDL "entity" objects representing surfaces, textures, and audio, referenced by ID. It uses the [uthash](https://troydhanson.github.io/uthash/) library for super-fast ID lookups, making it very responsive.
 
-With SDLua, you can quickly build simple apps with a single Lua script — no compiling needed — just fast, raw access to some useful SDL3 goodies!
+With SDLua, you can quickly build simple apps with a single Lua script, no compilation needed! just fast, raw access to some useful SDL3 goodies!
 
 Miniaudio is used instead of SDL3_mixer, since mixer has platform compatibility issues. SDLua runs on Arch Linux and Windows 10 (with some effort), with miniaudio providing a more reliable and portable audio solution for now.
 
@@ -12,7 +12,7 @@ Both uthash and miniaudio source files are included in the `lib/` directory.
 
 ---
 
-## Installation
+## Clone and compile
 
 Make sure SDL3, SDL3_image, and SDL3_ttf subsystems are installed on your target machine.
 
@@ -179,7 +179,7 @@ shows you all you need to know to build a simple game.
 
 ## Future Plans
 
-Over the coming weeks, I plan to add more functionality for manipulating and working with surfaces and textures.
+Over the coming weeks I plan to add more functionality for manipulating and working with surfaces and textures.
 
 This project started as a fun way to learn SDL3, having used SDL many years ago. SDL3 has changed a lot, and this has been a great learning experience.
 
