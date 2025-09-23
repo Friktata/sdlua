@@ -164,7 +164,7 @@ The `--log` option enables verbose output to standard output; omit it to disable
 
 Each script is small, well-commented, and designed to showcase specific features.
 
-All it does is render and display a surface and an image - these are responsive, if you
+All it does is render and display a surface and an image and makes responsive. If you
 press the `f` key the app toggles between fullscreen and windowed modes.
 
 We can use the `p` key to pause/resume the track, or if the track ends we can press
@@ -189,4 +189,18 @@ Also, learning how to build a C app embedding Lua has been educational — still
 
 ---
 
-Thanks for checking out SDLua!
+Update:
+
+Added some new stuff - firstly, more error checking to validate input, functions will
+check to ensure the correct parameters are passed and handle the logging.
+
+Also added a few new functions, specifically:
+
+    `SDL_Putpixel`()
+    `SDL_Getpixel`()
+
+See:
+_
+    include/sdl_lib.h
+
+For a list of available functions.

@@ -1,6 +1,8 @@
 #ifndef SDL_LIB_H
 #define SDL_LIB_H
 
+#include <stdarg.h>
+
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -23,6 +25,8 @@ int     l_sdl_window_info   (lua_State *);
 int     l_sdl_fullscreen    (lua_State *);
 int     l_sdl_drawcolor     (lua_State *);
 int     l_sdl_surface       (lua_State *);
+int     l_sdl_put_pixel     (lua_State *);
+int     l_sdl_get_pixel     (lua_State *);
 int     l_sdl_fill_surface  (lua_State *);
 int     l_sdl_texture       (lua_State *);
 int     l_sdl_image         (lua_State *);
@@ -47,6 +51,8 @@ static const struct luaL_Reg sdl_lib[] = {
     { "SDL_Fullscreen",     l_sdl_fullscreen },
     { "SDL_Drawcolor",      l_sdl_drawcolor },
     { "SDL_Surface",        l_sdl_surface },
+    { "SDL_Putpixel",       l_sdl_put_pixel },
+    { "SDL_Getpixel",       l_sdl_get_pixel },
     { "SDL_Fill",           l_sdl_fill_surface },
     { "SDL_Texture",        l_sdl_texture },
     { "SDL_Image",          l_sdl_image },

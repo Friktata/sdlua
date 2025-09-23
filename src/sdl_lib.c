@@ -8,22 +8,35 @@ extern ma_engine audio_engine;
 /**
  *
  */
+char *__sdl_error_msg(
+    const char                  *fmt,
+    ...
+) {
+    static char err_msg[LUA_ERR_LEN] = {0};
+    va_list list;
+
+    va_start(list, fmt);
+    vsnprintf(err_msg, LUA_ERR_LEN, fmt, list);
+    va_end(list);
+
+    return (err_msg[0] == '\0') ? NULL : &err_msg[0];
+}
+
+/**
+ *
+ */
 char *__sdl_entity(
     APP                         *app,
     const char                  *entity_id
 ) {
     static int index = 0;
-    static char err_msg[LUA_ERR_LEN];
-    
-    char *err = NULL;
 
     SDL_Entity **entity = app->entity;
     int entities = app->entities;
 
     if (! entity) {
         if ((entity = malloc(sizeof(SDL_Entity *))) == NULL) {
-            snprintf(err_msg, LUA_ERR_LEN, "malloc() error in __new_sql_entity(): %s\n", strerror(errno));
-            return &err_msg[0];
+            return __sdl_error_msg("malloc() error in __new_sql_entity(): %s\n", strerror(errno));
         }
         entities = 0;
     }
@@ -31,8 +44,7 @@ char *__sdl_entity(
         SDL_Entity **new_entities = realloc(entity, (sizeof(SDL_Entity *) * (entities + 1)));
 
         if (! new_entities) {
-            snprintf(err_msg, LUA_ERR_LEN, "realloc() error in __new_sql_entity(): %s\n", strerror(errno));
-            return &err_msg[0];
+            return __sdl_error_msg("realloc() error in __new_sql_entity(): %s\n", strerror(errno));
         }
 
         entity = new_entities;
@@ -41,8 +53,7 @@ char *__sdl_entity(
     if ((entity[entities] = malloc(sizeof(SDL_Entity))) == NULL) {
         free(entity);
         entity = NULL;
-        snprintf(err_msg, LUA_ERR_LEN, "malloc() error in __new_sql_entity(): %s\n", strerror(errno));
-        return &err_msg[0];
+        return __sdl_error_msg("malloc() error in __new_sql_entity(): %s\n", strerror(errno));
     }
 
     entity[entities]->type = SDL_ENTITY_EMPTY;
@@ -53,8 +64,7 @@ char *__sdl_entity(
     if ((entity[entities]->id = malloc(strlen(entity_id) + 1)) == NULL) {
         free(entity);
         entity = NULL;
-        snprintf(err_msg, LUA_ERR_LEN, "malloc() error in __new_sql_entity(): %s\n", strerror(errno));
-        return &err_msg[0];
+        return __sdl_error_msg("malloc() error in __new_sql_entity(): %s\n", strerror(errno));
     }
 
     snprintf(entity[entities]->id, (strlen(entity_id) + 1), "%s", entity_id);
@@ -73,7 +83,149 @@ char *__sdl_entity(
         fprintf(app->log, ">>> Created new SDL_Entity \"%s\"\n", entity_id);
     }
 
-    return err;
+    return NULL;
+}
+
+/**
+ *
+ */
+char *__sdl_surface_put_pixel(
+    SDL_Surface *surface,
+    const int x,
+    const int y,
+    uint8_t red,
+    uint8_t green,
+    uint8_t blue,
+    uint8_t alpha
+) {
+    static char err_msg[LUA_ERR_LEN];
+
+    if (x < 0 || y < 0 || x >= surface->w || y >= surface->h) {
+        return NULL;
+    }
+
+    if (SDL_MUSTLOCK(surface)) {
+        if (SDL_LockSurface(surface) != 0) {
+            return __sdl_error_msg("SDL_Putpixel(): Unable to lock surface: %s\n", SDL_GetError());
+        }
+    }
+
+    Uint8 *pixels = (Uint8 *) surface->pixels;
+    int bpp = SDL_BYTESPERPIXEL(surface->format);
+    int pitch = surface->pitch;
+    Uint8 *p = pixels + y * pitch + x * bpp;
+
+    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(surface->format);
+
+    if (!fmt) {
+        if (SDL_MUSTLOCK(surface)) {
+            SDL_UnlockSurface(surface);
+        }
+        return __sdl_error_msg("SDL_Putpixel(): SDL_GetPixelFormatDetails failed: %s\n", SDL_GetError());
+    }
+
+    Uint32 pixel_value = SDL_MapRGBA(fmt, NULL, red, green, blue, alpha);
+
+    switch (bpp) {
+        case 1:
+            *p = pixel_value & 0xFF;
+            break;
+        case 2:
+            *(Uint16 *)p = pixel_value & 0xFFFF;
+            break;
+        case 3:
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+            p[0] = (pixel_value >> 16) & 0xFF;
+            p[1] = (pixel_value >> 8) & 0xFF;
+            p[2] = pixel_value & 0xFF;
+#else
+            p[0] = pixel_value & 0xFF;
+            p[1] = (pixel_value >> 8) & 0xFF;
+            p[2] = (pixel_value >> 16) & 0xFF;
+#endif
+            break;
+        case 4:
+            *(Uint32 *)p = pixel_value;
+            break;
+    }
+
+    SDL_UnlockSurface(surface);
+
+    return NULL;
+}
+
+/**
+ *
+ */
+char *__sdl_surface_get_pixel(
+    SDL_Surface *surface,
+    int x,
+    int y,
+    uint8_t *red,
+    uint8_t *green,
+    uint8_t *blue,
+    uint8_t *alpha
+) {
+    static char err_msg[LUA_ERR_LEN];
+
+    if (x < 0 || y < 0 || x >= surface->w || y >= surface->h) {
+        return NULL;
+    }
+
+    bool locked = false;
+    if (SDL_MUSTLOCK(surface)) {
+        if (SDL_LockSurface(surface) != 0) {
+            return __sdl_error_msg("SDL_Getpixel(): Unable to lock surface: %s\n", SDL_GetError());
+        }
+        locked = true;
+    }
+
+    Uint8 *pixels = (Uint8 *) surface->pixels;
+    int bpp = SDL_BYTESPERPIXEL(surface->format);
+    int pitch = surface->pitch;
+    Uint8 *p = pixels + y * pitch + x * bpp;
+
+    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(surface->format);
+    if (!fmt) {
+        if (locked) {
+            SDL_UnlockSurface(surface);
+        } 
+        return __sdl_error_msg("SDL_Getpixel(): SDL_GetPixelFormatDetails failed: %s\n", SDL_GetError());
+    }
+
+    Uint32 pixel_value;
+
+    switch (bpp) {
+        case 1:
+            pixel_value = *p;
+            break;
+        case 2:
+            pixel_value = *(Uint16 *) p;
+            break;
+        case 3:
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+            pixel_value = p[0] << 16 | p[1] << 8 | p[2];
+#else
+            pixel_value = p[0] | p[1] << 8 | p[2] << 16;
+#endif
+            break;
+        case 4:
+            pixel_value = *(Uint32 *) p;
+            break;
+        default:
+            if (locked) {
+                SDL_UnlockSurface(surface);
+            }    
+            return NULL;
+    }
+
+    SDL_GetRGBA(pixel_value, fmt, NULL, red, green, blue, alpha);
+
+    if (locked) {
+        SDL_UnlockSurface(surface);
+    }
+
+    return NULL;
 }
 
 /**
@@ -161,40 +313,207 @@ static void __sdl_mouse_motion_event(
 /**
  *
  */
+int __lua_error_msg(
+    lua_State                   *state,
+    const char                  *fmt,
+    ...
+) {
+    char err_msg[LUA_ERR_LEN] = {0};
+    va_list list;
+
+    va_start(list, fmt);
+    vsnprintf(err_msg, LUA_ERR_LEN, fmt, list);
+    va_end(list);
+
+    lua_pushstring(state, err_msg);
+    return 1;
+}
+
+/**
+ *
+ */
+const char *__lua_table_get_string(
+    lua_State                   *state,
+    char                        *function_name,
+    int                         pos,
+    char                        *id
+) {
+    lua_getfield(state, pos, id);
+
+    if (lua_isnoneornil(state, -1)) {
+        __lua_error_msg(state, "%s No window[\"%s\"] specified\n", function_name, id);
+        return NULL;
+    }
+    if (lua_type(state, -1) != LUA_TSTRING) {
+        __lua_error_msg(state, "%s: The window[\"%s\"] parameter must be a string\n", function_name, id);
+        return NULL;
+    }
+
+    const char *result = luaL_checkstring(state, -1);
+    lua_pop(state, 1);
+
+    return result;
+}
+
+/**
+ *
+ */
+char *__lua_table_get_integer(
+    lua_State                   *state,
+    char                        *function_name,
+    int                         pos,
+    char                        *id,
+    int                         *number
+) {
+    lua_getfield(state, pos, id);
+
+    if (lua_isnoneornil(state, -1)) {
+        __lua_error_msg(state, "%s: No window[\"%s\"] specified\n", function_name, id);
+        return NULL;
+    }
+    if (lua_type(state, -1) != LUA_TNUMBER) {
+        __lua_error_msg(state, "%s: The window[\"%s\"] parameter must be an integer\n", function_name, id);
+        return NULL;
+    }
+
+    *number = luaL_checkinteger(state, -1);
+    lua_pop(state, 1);
+
+    return "OK";
+}
+
+/**
+ *
+ */
+char *__lua_table_get_boolean(
+    lua_State                   *state,
+    char                        *function_name,
+    int                         pos,
+    char                        *id,
+    bool                        *bln
+) {
+    lua_getfield(state, pos, id);
+
+    if (lua_isnoneornil(state, -1)) {
+        __lua_error_msg(state, "%s: No window[\"%s\"] specified\n", function_name, id);
+        return NULL;
+    }
+    if (lua_type(state, -1) != LUA_TBOOLEAN) {
+        __lua_error_msg(state, "%s: The window[\"%s\"] parameter must be a boolean\n", function_name, id);
+        return NULL;
+    }
+
+    *bln = lua_toboolean(state, -1);
+    lua_pop(state, 1);
+
+    return "OK";
+}
+
+/**
+ *
+ */
+char *__lua_table_get_rgba(
+    lua_State                   *state,
+    char                        *function_name,
+    int                         pos,
+    SDL_Color                   *rgba
+) {
+    int red, green, blue, alpha;
+
+    if (! __lua_table_get_integer(state, function_name, pos, "red", &red)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "green", &green)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "blue", &blue)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "alpha", &alpha)) {
+        return NULL;
+    }
+
+    rgba->r = (uint8_t) red;
+    rgba->g = (uint8_t) green;
+    rgba->b = (uint8_t) blue;
+    rgba->a = (uint8_t) alpha;
+
+    return "OK";
+}
+
+/**
+ *
+ */
+char *__lua_table_get_area(
+    lua_State                   *state,
+    char                        *function_name,
+    int                         pos,
+    SDL_FRect                   *area
+) {
+    int x, y, w, h;
+
+    if (! __lua_table_get_integer(state, function_name, pos, "x", &x)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "y", &y)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "width", &w)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "height", &h)) {
+        return NULL;
+    }
+
+    area->x = x;
+    area->y = y;
+    area->w = w;
+    area->h = h;
+
+    return "OK";
+}
+
+/**
+ *
+ */
 int l_sdl_init(
     lua_State                   *state
 ) {
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
-    char err_msg[LUA_ERR_LEN];
 
     if (app->flags & APP_F_SDLINIT) {
-        lua_pushstring(state, "SDL_Init(): Already initialised\n");
-        return 1;
+        return __lua_error_msg(state, "SDL_Init(): Already initialised\n");
+    }
+
+    if (lua_gettop(state) != 2) {
+        return __lua_error_msg(state, "SDL_Init(): Exactly 2 parameters expected\n");
+    }
+    if (! lua_isinteger(state, 1)) {
+        return __lua_error_msg(state, "SDL_Init(): Integer expected for first parameter\n");
+    }
+    if (! lua_istable(state, 2)) {
+        return __lua_error_msg(state, "SDL_Init(): Table expected for second parameter\n");
     }
 
     const uint32_t sdl_flags = (uint32_t) lua_tointeger(state, 1);
-    
     if (! SDL_Init(sdl_flags)) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error initialising SDL: %s\n", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Init(): $s\n", SDL_GetError());
     }
 
-    lua_getfield(state, 2, "title");
-    const char *window_title = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    const char *window_title = __lua_table_get_string(state, "SDL_Init()", 2, "title");
+    if (! window_title) return 1;
 
-    lua_getfield(state, 2, "width");
-    const int window_width = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    int window_width, window_height, window_flags;
 
-    lua_getfield(state, 2, "height");
-    const int window_height = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 2, "flags");
-    const int window_flags = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    if (! __lua_table_get_integer(state, "SDL_Init()", 2, "width", &window_width)) {
+        return 1;
+    }
+    if (! __lua_table_get_integer(state, "SDL_Init()", 2, "height", &window_height)) {
+        return 1;
+    }
+    if (! __lua_table_get_integer(state, "SDL_Init()", 2, "flags", &window_flags)) {
+        return 1;
+    }
 
     if ((app->window = SDL_CreateWindow(
         window_title,
@@ -202,15 +521,11 @@ int l_sdl_init(
         window_height,
         window_flags
     )) == NULL) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error creating SDL window: %s\n", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Init(): %s\n", SDL_GetError());
     }
 
     if ((app->renderer = SDL_CreateRenderer(app->window, NULL)) == NULL) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error creating SDL renderer: %s\n", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Init(): %s\n", SDL_GetError());
     }
 
     app->flags |= APP_F_SDLINIT;
@@ -218,9 +533,9 @@ int l_sdl_init(
     if (app->log) {
         fprintf(app->log, ">>> Initialised SDL\n    Window title: %s\n    Window width: %d\n    Window height: %d\n    Window flags: %d\n",
             window_title,
-            (int) window_width,
-            (int) window_height,
-            (int) window_flags
+            window_width,
+            window_height,
+            window_flags
         );
     }
 
@@ -237,8 +552,7 @@ int l_sdl_quit(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Quit(): SDL is not initialised\n");
-        return 1;
+        return __lua_error_msg(state, "SDL_Quit(): SDL is not initialised\n");
     }
 
     app_cleanup(app);
@@ -254,14 +568,19 @@ int l_sdl_delay(
     lua_State                   *state
 ) {
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
-
+    
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Delay(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Delay(): SDL not initialised");
     }
 
-    int ms = luaL_checkinteger(state, 1);
-    SDL_Delay(ms);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Delay(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_isinteger(state, 1)) {
+        return __lua_error_msg(state, "SDL_Delay(): Integer expected for first parameter\n");
+    }
+    
+    SDL_Delay(lua_tointeger(state, 1));
     
     lua_pushstring(state, "OK");
     return 1;
@@ -273,8 +592,17 @@ int l_sdl_delay(
 int l_sdl_event(
     lua_State                   *state
 ) {
+    if (lua_gettop(state) != 2) {
+        return __lua_error_msg(state, "SDL_Event(): Exactly 1 parameter expected\n");
+    }
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        return __lua_error_msg(state, "SDL_Event(): String expected for first parameter\n");
+    }
+    if (lua_type(state, 2) != LUA_TFUNCTION) {
+        return __lua_error_msg(state, "SDL_Event(): Function expected for second parameter\n");
+    }
+
     const char *event_name = luaL_checkstring(state, 1);
-    luaL_checktype(state, 2, LUA_TFUNCTION);
 
     lua_pushstring(state, event_name);
     lua_pushvalue(state, 2);
@@ -293,8 +621,7 @@ int l_sdl_poll(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Poll(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Poll(): SDL not initialised");
     }
 
     SDL_Event event;
@@ -361,8 +688,9 @@ __lbl_add_event:
         }
 
         if (lua_pcall(state, 1, 0, 0) != LUA_OK) {
-            fprintf(stderr, "Lua error in event handler: %s\n", lua_tostring(state, -1));
+            __lua_error_msg(state, "SDL_Poll(): Error in event handler (%s) %s\n", event_name, lua_tostring(state, -1));
             lua_pop(state, 1);
+            return 1;
         }
 
         if ((strcmp(event_name, "fullscreen") == 0) || (strcmp(event_name, "windowed") == 0)) {
@@ -383,15 +711,13 @@ int l_sdl_screen_info(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Info(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Info(): SDL not initialised");
     }
 
     SDL_Rect bounds;
 
     if (! SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &bounds) ) {
-        lua_pushstring(state, SDL_GetError());
-        return 1;
+        return __lua_error_msg(state, "%s", SDL_GetError());
     }
 
     const int max_width = bounds.w;
@@ -419,8 +745,7 @@ int l_sdl_window_info(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Info(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Windowinfo(): SDL not initialised");
     }
 
     uint32_t window_width;
@@ -449,28 +774,23 @@ int l_sdl_drawcolor(
 ) {
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Drawcolor(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Drawcolor(): Table expected for first parameter\n");
+    }
+    
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Drawcolor(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Drawcolor(): SDL not initialised");
     }
 
-    lua_getfield(state, 1, "red");
-    const uint8_t red = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    SDL_Color rgba;
+    if (! __lua_table_get_rgba(state, "SDL_Drawcolor()", 1, &rgba)) {
+        return 1;
+    }
     
-    lua_getfield(state, 1, "green");
-    const uint8_t green = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-    
-    lua_getfield(state, 1, "blue");
-    const uint8_t blue = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-    
-    lua_getfield(state, 1, "alpha");
-    const uint8_t alpha = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-    
-    SDL_SetRenderDrawColor(app->renderer, red, green, blue, alpha);
+    SDL_SetRenderDrawColor(app->renderer, rgba.r, rgba.g, rgba.b, rgba.a);
 
     lua_pushstring(state, "OK");
     return 1;
@@ -485,17 +805,22 @@ int l_sdl_fullscreen(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Fullscreen(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Fullscreen(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Fullscreen(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_isboolean(state, 1)) {
+        return __lua_error_msg(state, "SDL_Fullscreen(): Boolean expected for first parameter\n");
     }
 
     luaL_checktype(state, 1, LUA_TBOOLEAN);
 
     const int bln = lua_toboolean(state, 1);
 
-    if (!SDL_SetWindowFullscreen(app->window, bln)) {
-        lua_pushstring(state, SDL_GetError());
-        return 1;
+    if (! SDL_SetWindowFullscreen(app->window, bln)) {
+        return __lua_error_msg(state, SDL_GetError());
     }
 
     lua_pushstring(state, "OK");
@@ -513,17 +838,28 @@ int l_sdl_surface(
     char err_msg[LUA_ERR_LEN];
     char *err = NULL;
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Surface(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Surface(): Table expected for first parameter\n");
+    }
 
-    lua_getfield(state, 1, "width");
-    const int entity_width = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    const char *entity_id = __lua_table_get_string(state, "SDL_Surface()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
 
-    lua_getfield(state, 1, "height");
-    const int entity_height = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    int entity_width, entity_height;
+    char *result = __lua_table_get_integer(state, "SDL_Surface()", 1, "width", &entity_width);
+    if (! result) {
+        return 1;
+    }
+
+    result = __lua_table_get_integer(state, "SDL_Surface()", 1, "height", &entity_height);
+    if (! result) {
+        return 1;
+    }
 
     if ((err = __sdl_entity(app, entity_id)) != NULL) {
         lua_pushstring(state, err);
@@ -535,24 +871,20 @@ int l_sdl_surface(
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Surface(): Error creating entity \"%s\"\n", entity_id);
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Surface(): Error creating entity \"%s\"\n", entity_id);
     }
 
     entity->surface = SDL_CreateSurface(entity_width, entity_height, SDL_PIXELFORMAT_ARGB8888);
 
     if (! entity->surface) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Surface(): %s\n", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Surface(): %s\n", SDL_GetError());
     }
 
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL surface %s (%dx%d)\n",
             entity_id,
-            (int) entity_width,
-            (int) entity_height
+            entity_width,
+            entity_height
         );
     }
 
@@ -572,42 +904,167 @@ int l_sdl_fill_surface(
     SDL_Entity *entity = NULL;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Fill(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Fill(): SDL not initialised");
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Fill(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Fill(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Fill()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Fill(): Entity \"%s\" not found\n", entity_id);
-        lua_pushstring(state, err_msg);
+        return __lua_error_msg(state, "SDL_Fill(): Entity \"%s\" not found\n", entity_id);
+    }
+
+    SDL_Color rgba;
+    char *result = __lua_table_get_rgba(state, "SDL_Fill()", 1, &rgba);
+    if (! result) {
         return 1;
     }
 
-    lua_getfield(state, 1, "red");
-    const uint8_t red = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "green");
-    const uint8_t green = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "blue");
-    const uint8_t blue = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "alpha");
-    const uint8_t alpha = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    Uint32 rgba = SDL_MapSurfaceRGBA(entity->surface, red, green, blue, alpha);        
-    SDL_FillSurfaceRect(entity->surface, NULL, rgba);
+    Uint32 sdl_color = SDL_MapSurfaceRGBA(entity->surface, rgba.r, rgba.g, rgba.b, rgba.a);        
+    SDL_FillSurfaceRect(entity->surface, NULL, sdl_color);
 
     lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_put_pixel(
+    lua_State                   *state
+) {
+    char err_msg[LUA_ERR_LEN];
+    char *err;
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    SDL_Entity *entity = NULL;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Putpixel(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Putpixel(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Putpixel(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Putpixel", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    if (! entity) {
+        return __lua_error_msg(state, "SDL_Putpixel(): Entity \"%s\" not found\n", entity_id);
+    }
+
+    int x, y;
+    const char *result = __lua_table_get_integer(state, "SDL_Putpixel()", 1, "x", &x);
+    if (! result) {
+        return 1;
+    }
+    result = __lua_table_get_integer(state, "SDL_Putpixel()", 1, "y", &y);
+    if (! result) {
+        return 1;
+    }
+
+    SDL_Color rgba;
+    if ((result = __lua_table_get_rgba(state, "SDL_Putpixel()", 1, &rgba)) == NULL) {
+        return 1;
+    }
+
+    if (entity->surface) {
+        err = __sdl_surface_put_pixel(entity->surface, x, y, rgba.r, rgba.g, rgba.b, rgba.a);
+        if (err) {
+            lua_pushstring(state, err);
+            return 1;
+        }
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_get_pixel(
+    lua_State                   *state
+) {
+    char err_msg[LUA_ERR_LEN];
+    char *err;
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+    SDL_Entity *entity = NULL;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Getpixel(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Getpixel(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Getpixel(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Getpixel()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    if (! entity) {
+        return __lua_error_msg(state, "SDL_Getpixel(): Entity \"%s\" not found\n", entity_id);
+    }
+
+    int x, y;
+    char *result = __lua_table_get_integer(state, "SDL_Getpixel()", 1, "x", &x);
+    if (! result) {
+        return 1;
+    }
+
+    result = __lua_table_get_integer(state, "SDL_Getpixel()", 1, "y", &y);
+    if (! result) {
+        return 1;
+    }
+
+    uint8_t red, green, blue, alpha;
+
+    if (entity->surface) {
+        err = __sdl_surface_get_pixel(entity->surface, x, y, &red, &green, &blue, &alpha);
+        if (err) {
+            return __lua_error_msg(state, err);
+        }
+    }
+
+    lua_newtable(state);
+
+    lua_pushinteger(state, red);
+    lua_setfield(state, -2, "red");
+    lua_pushinteger(state, green);
+    lua_setfield(state, -2, "green");
+    lua_pushinteger(state, blue);
+    lua_setfield(state, -2, "blue");
+    lua_pushinteger(state, alpha);
+    lua_setfield(state, -2, "alpha");
+
     return 1;
 }
 
@@ -625,48 +1082,40 @@ int l_sdl_texture(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Texture(): SDL not initialised");
+        return __lua_error_msg(state, "SDL_Texture(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Texture(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Texture(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Texture()", 1, "id");
+    if (! entity_id) {
         return 1;
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "x");
-    const int entity_x = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "y");
-    const int entity_y = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "width");
-    const int entity_width = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "height");
-    const int entity_height = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    SDL_FRect area;
+    char *result = __lua_table_get_area(state, "SDL_Texture()", 1, &area);
+    if (! result) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
         if ((err = __sdl_entity(app, entity_id)) != NULL) {
-            lua_pushstring(state, err);
-            return 1;
+            return __lua_error_msg(state, err);
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Texture(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "Error in SDL_Texture(): Entity \"%s\" not found\n", entity_id);
         }
-        entity->surface = SDL_CreateSurface(entity_width, entity_height, SDL_PIXELFORMAT_ARGB8888);
+        entity->surface = SDL_CreateSurface(area.w, area.h, SDL_PIXELFORMAT_ARGB8888);
         if (! entity->surface) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Texture(): %s\n", SDL_GetError());
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Texture(): %s\n", SDL_GetError());
         }
     }
 
@@ -674,13 +1123,14 @@ int l_sdl_texture(
         SDL_DestroyTexture(entity->texture);
         entity->texture = NULL;
     }
+
     if ((entity->texture = SDL_CreateTextureFromSurface(app->renderer, entity->surface)) == NULL) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Texture(): %s\n", entity_id);
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Texture(): %s\n", entity_id);
     }
 
-    SDL_FRect area = { entity_x, entity_y, entity_width, entity_height };
+    if (app->log) {
+        fprintf(app->log, ">>> Destroyed existing texture %s\n", entity_id);
+    }
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
     memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
@@ -688,10 +1138,10 @@ int l_sdl_texture(
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL texture %s @ %dx%d (%dx%d)\n",
             entity_id,
-            (int) entity_x,
-            (int) entity_y,
-            (int) entity_width,
-            (int) entity_height
+            area.x,
+            area.y,
+            area.w,
+            area.h
         );
     }
 
@@ -713,52 +1163,45 @@ int l_sdl_image(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Image(): SDL not initialised");
+        return __lua_error_msg(state, "SDL_Image(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Image(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Image(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Image()", 1, "id");
+    if (! entity_id) {
         return 1;
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    const char *entity_path = __lua_table_get_string(state, "SDL_Image()", 1, "image");
+    if (! entity_path) {
+        return 1;
+    }
 
-    lua_getfield(state, 1, "image");
-    const char *entity_path = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "x");
-    const int entity_x = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "y");
-    const int entity_y = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "width");
-    const int entity_width = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "height");
-    const int entity_height = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    SDL_FRect area;
+    char *result = __lua_table_get_area(state, "SDL_Image()", 1, &area);
+    if (! result) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
         if ((err = __sdl_entity(app, entity_id)) != NULL) {
-            lua_pushstring(state, err);
-            return 1;
+            return __lua_error_msg(state, err);
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Image(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Image(): Entity \"%s\" not found\n", entity_id);
         }
-        entity->surface = SDL_CreateSurface(entity_width, entity_height, SDL_PIXELFORMAT_ARGB8888);
+        entity->surface = SDL_CreateSurface(area.w, area.h, SDL_PIXELFORMAT_ARGB8888);
         if (! entity->surface) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Image(): %s\n", SDL_GetError());
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Image(): %s\n", SDL_GetError());
         }
     }
 
@@ -772,18 +1215,12 @@ int l_sdl_image(
     }
 
     if ((entity->surface = IMG_Load(entity_path)) == NULL) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Image(): %s\n", entity_id);
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Image(): %s\n", entity_id);
     }
 
     if ((entity->texture = SDL_CreateTextureFromSurface(app->renderer, entity->surface)) == NULL) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Image(): %s\n", entity_id);
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Image(): %s\n", entity_id);
     }
-
-    SDL_FRect area = { entity_x, entity_y, entity_width, entity_height };
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
     memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
@@ -791,10 +1228,10 @@ int l_sdl_image(
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL image %s @ %dx%d (%dx%d)\n",
             entity_id,
-            (int) entity_x,
-            (int) entity_y,
-            (int) entity_width,
-            (int) entity_height
+            area.x,
+            area.y,
+            area.w,
+            area.h
         );
     }
 
@@ -821,76 +1258,57 @@ int l_sdl_text(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Text(): SDL not initialised");
+        return __lua_error_msg(state, "SDL_Text(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Text(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Text(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Text()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
+    const char *entity_path = __lua_table_get_string(state, "SDL_Text()", 1, "font");
+    if (! entity_path) {
+        return 1;
+    }
+    int entity_size;
+    const char *result = __lua_table_get_integer(state, "SDL_Text()", 1, "size", &entity_size);
+    if (! result) {
+        return 1;
+    }
+    const char *entity_text = __lua_table_get_string(state, "SDL_Text()", 1, "text");
+    if (! entity_text) {
         return 1;
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    SDL_FRect area;
+    if ((result = __lua_table_get_area(state, "SDL_Text()", 1, &area)) == NULL) {
+        return 1;
+    }
 
-    lua_getfield(state, 1, "font");
-    const char *entity_path = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "size");
-    const int entity_size = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "text");
-    const char *entity_text = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "x");
-    const int entity_x = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "y");
-    const int entity_y = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "width");
-    const int entity_width = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "height");
-    const int entity_height = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "red");
-    const uint8_t red = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "green");
-    const uint8_t green = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "blue");
-    const uint8_t blue = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "alpha");
-    const uint8_t alpha = (uint8_t) luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
+    SDL_Color rgba;
+    if ((result = __lua_table_get_rgba(state, "SDL_Text()", 1, &rgba)) == NULL) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
         if ((err = __sdl_entity(app, entity_id)) != NULL) {
-            lua_pushstring(state, err);
-            return 1;
+            return __lua_error_msg(state, err);
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Text(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Text(): Entity \"%s\" not found\n", entity_id);
         }
-        entity->surface = SDL_CreateSurface(entity_width, entity_height, SDL_PIXELFORMAT_ARGB8888);
+        entity->surface = SDL_CreateSurface(area.w, area.h, SDL_PIXELFORMAT_ARGB8888);
         if (! entity->surface) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Text(): %s\n", SDL_GetError());
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Text(): %s\n", SDL_GetError());
         }
     }
 
@@ -908,9 +1326,7 @@ int l_sdl_text(
             fprintf(app->log, ">>> Initialising TTF subsystem\n");
         }
         if (! TTF_Init()) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Text(): %s\n", SDL_GetError());
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Text(): %s\n", SDL_GetError());
         }
         app->flags |= APP_F_TTFINIT;
     }
@@ -918,28 +1334,19 @@ int l_sdl_text(
     TTF_Font *font = TTF_OpenFont(entity_path, entity_size);
     
     if (! font) {
-        snprintf(err_msg, LUA_ERR_LEN, "%s", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "%s", SDL_GetError());
     }
-
-    SDL_FRect area = { entity_x, entity_y, entity_width, entity_height };
-    SDL_Color rgba = { red, green, blue, alpha };
 
     entity->surface = TTF_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
 
     if (! entity->surface) {
-        snprintf(err_msg, LUA_ERR_LEN, "%s", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "%s", SDL_GetError());
     }
 
     entity->texture = SDL_CreateTextureFromSurface(app->renderer, entity->surface);
 
     if (! entity->texture) {
-        snprintf(err_msg, LUA_ERR_LEN, "%s", SDL_GetError());
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "%s", SDL_GetError());
     }
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
@@ -948,10 +1355,10 @@ int l_sdl_text(
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL text %s @ %dx%d (%dx%d), font=\"%s\", size=%d, text=\"%s\"\n",
             entity_id,
-            entity_x,
-            entity_y,
-            entity_width,
-            entity_height,
+            area.x,
+            area.y,
+            area.w,
+            area.h,
             entity_path,
             entity_size,
             entity_text
@@ -959,8 +1366,7 @@ int l_sdl_text(
     }
 
     if ((err = entity_set_text(entity, entity_path, entity_text, entity_size, rgba)) != NULL) {
-        lua_pushstring(state, err);
-        return 1;
+        return __lua_error_msg(state, err);
     }
 
     TTF_CloseFont(font);
@@ -983,42 +1389,31 @@ int l_sdl_update(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Audio(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Update(): SDL not initialised");
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Update(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Update(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Update()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Audio(): Entity \"%s\" not found\n", entity_id);
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Update(): Entity \"%s\" not found\n", entity_id);
     }
 
-    lua_getfield(state, 1, "x");
-    const int entity_x = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "y");
-    const int entity_y = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "width");
-    const int entity_width = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "height");
-    const int entity_height = luaL_checkinteger(state, -1);
-    lua_pop(state, 1);
-
-    entity->area.x = entity_x;
-    entity->area.y = entity_y;
-    entity->area.w = entity_width;
-    entity->area.h = entity_height;
+    char *result = __lua_table_get_area(state, "SDL_Update()", 1, &entity->area);
+    if (! result) {
+        return 1;
+    }
 
     lua_pushstring(state, "OK");
     return 1;
@@ -1038,34 +1433,41 @@ int l_sdl_audio(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Audio(): SDL not initialised");
+        return __lua_error_msg(state, "SDL_Audio(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Audio(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Audio(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Audio()", 1, "id");
+    if (! entity_id) {
         return 1;
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    const char *entity_path = __lua_table_get_string(state, "SDL_Audio()", 1, "audio");
+    if (! entity_path) {
+        return 1;
+    }
 
-    lua_getfield(state, 1, "audio");
-    const char *entity_path = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
-
-    lua_getfield(state, 1, "autoplay");
-    const bool autoplay = lua_toboolean(state, -1);
-    lua_pop(state, 1);
+    bool autoplay;
+    const char *result = __lua_table_get_boolean(state, "SDL_Audio()", 1, "autoplay", &autoplay);
+    if (! result) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
         if ((err = __sdl_entity(app, entity_id)) != NULL) {
-            lua_pushstring(state, err);
-            return 1;
+            return __lua_error_msg(state, err);
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Audio(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Audio(): Entity \"%s\" not found\n", entity_id);
         }
     }
 
@@ -1080,9 +1482,7 @@ int l_sdl_audio(
 
     if (! (app->flags & APP_F_AUDIOINIT)) {
         if (ma_engine_init(NULL, &app->engine) != MA_SUCCESS) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Audio(): Error initialising audio engine\n");
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Audio(): Error initialising audio engine\n");
         }
         if (app->log) { 
             fprintf(app->log, ">>> Initialised audio engine\n");
@@ -1093,19 +1493,16 @@ int l_sdl_audio(
     entity->decoder = (ma_decoder){0};
 
     if (ma_decoder_init_file(entity_path, NULL, &entity->decoder) != MA_SUCCESS) {
-        printf("Failed to init decoder: %s\n", entity_path);
-        return 1;
+        return __lua_error_msg(state, "SDL_Audio(): Failed to init decoder: %s\n", entity_path);
     }
 
     if (autoplay) {
         if (ma_sound_init_from_data_source(&app->engine, &entity->decoder, 0, NULL, &entity->sound) != MA_SUCCESS) {
-            printf("Failed to init sound from decoder: %s\n", entity_path);
-            return 1;
+            return __lua_error_msg(state, "SDL_Audio(): Failed to init sound from decoder: %s\n", entity_path);
         }
 
         if (ma_engine_start(&app->engine) != MA_SUCCESS) {
-            printf("Failed to start audio engine\n");
-            return 1;
+            return __lua_error_msg(state, "SDL_Audio(): Failed to start audio engine\n");
         }
 
         ma_sound_set_volume(&entity->sound, 1.0f);
@@ -1114,10 +1511,8 @@ int l_sdl_audio(
         ma_sound_start(&entity->sound);
     }
 
-
     if ((err = entity_set_audio(entity, entity_path)) != NULL) {
-        lua_pushstring(state, err);
-        return 1;
+        return __lua_error_msg(state, err);
     }
 
     lua_pushstring(state, "OK");
@@ -1138,26 +1533,30 @@ int l_sdl_play(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Play(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Play(): SDL not initialised");
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Play(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Play(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Play()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
         if ((err = __sdl_entity(app, entity_id)) != NULL) {
-            lua_pushstring(state, err);
-            return 1;
+            return __lua_error_msg(state, err);
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Play(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Play(): Entity \"%s\" not found\n", entity_id);
         }
     }
 
@@ -1171,9 +1570,7 @@ int l_sdl_play(
     }
 
     if (result != MA_SUCCESS) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Play(): %s\n", ma_result_description(result));
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Play(): %s\n", ma_result_description(result));
     }
 
     lua_pushstring(state, "OK");
@@ -1194,26 +1591,30 @@ int l_sdl_audio_info(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Pause(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Audioinfo(): SDL not initialised");
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Audioinfo(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Audioinfo(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "ASL_Audioinfo()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
         if ((err = __sdl_entity(app, entity_id)) != NULL) {
-            lua_pushstring(state, err);
-            return 1;
+            return __lua_error_msg(state, err);
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Pause(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Pause(): Entity \"%s\" not found\n", entity_id);
         }
     }
 
@@ -1266,13 +1667,20 @@ int l_sdl_pause(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Pause(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Pause(): SDL not initialised");
     }
 
-    lua_getfield(state, 1, "id");
-    const char *entity_id = luaL_checkstring(state, -1);
-    lua_pop(state, 1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Pause(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Pause(): Table expected for first parameter\n");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_Pause()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
@@ -1283,9 +1691,7 @@ int l_sdl_pause(
         }
         HASH_FIND_STR(app->hash, entity_id, entity);
         if (! entity) {
-            snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Pause(): Entity \"%s\" not found\n", entity_id);
-            lua_pushstring(state, err_msg);
-            return 1;
+            return __lua_error_msg(state, "SDL_Pause(): Entity \"%s\" not found\n", entity_id);
         }
     }
 
@@ -1299,9 +1705,7 @@ int l_sdl_pause(
     }
 
     if (result != MA_SUCCESS) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Pause(): %s\n", ma_result_description(result));
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Pause(): %s\n", ma_result_description(result));
     }
 
     lua_pushstring(state, "OK");
@@ -1321,18 +1725,25 @@ int l_sdl_render(
     SDL_Entity *entity;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Texture(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Render(): SDL not initialised");
     }
 
-    const char *entity_id = luaL_checkstring(state, -1);
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Render(): Exactly 1 parameter expected\n");
+    }
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        return __lua_error_msg(state, "SDL_Render(): String expected for first parameter\n");
+    }
+
+    const char *entity_id = lua_tostring(state, 1);
+    if (! entity_id) {
+        return 1;
+    }
 
     HASH_FIND_STR(app->hash, entity_id, entity);
 
     if (! entity) {
-        snprintf(err_msg, LUA_ERR_LEN, "Error in SDL_Texture(): Entity \"%s\" not found\n", entity_id);
-        lua_pushstring(state, err_msg);
-        return 1;
+        return __lua_error_msg(state, "SDL_Texture(): Entity \"%s\" not found\n", entity_id);
     }
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &entity->area);
@@ -1350,8 +1761,7 @@ int l_sdl_clear(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Clear(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Clear(): SDL not initialised");
     }
 
     SDL_RenderClear(app->renderer);
@@ -1367,8 +1777,7 @@ int l_sdl_present(
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        lua_pushstring(state, "Error in SDL_Present(): SDL not initialised");
-        return 1;
+        return __lua_error_msg(state, "SDL_Present(): SDL not initialised");
     }
 
     SDL_RenderPresent(app->renderer);
