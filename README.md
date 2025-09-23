@@ -189,7 +189,7 @@ Also, learning how to build a C app embedding Lua has been educational — still
 
 ---
 
-Update:
+### Update
 
 Added some new stuff - firstly, more error checking to validate input, functions will
 check to ensure the correct parameters are passed and handle the logging.

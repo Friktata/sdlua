@@ -1,2 +1,3 @@
+.gitignore
 luadraw.lua
 sdlua
