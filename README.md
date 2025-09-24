@@ -86,8 +86,38 @@ Also added a few new functions, specifically:
     SDL_Getpixel()
 
 See:
-_
+
     include/sdl_lib.h
+
+Simple enough, we can call:
+
+```
+    SDL_Setpixel({
+        id = "surface",
+        x = 10,
+        y = 10,
+        red = 123,
+        green = 231,
+        blue = 132,
+        alpha = 255
+    })
+```
+
+To set a pixel at an **x, y** position on a surface, we can then use
+something like:
+
+```
+    pixel_info = SDL_Getpixel({
+        id = "surface",
+        x = 10,
+        y = 10
+    })
+
+    print("red=" .. pixel_info["red"])
+    print("green=" .. pixel_info["green"])
+    print("blue=" .. pixel_info["blue"])
+    print("alpha=" .. pixel_info["alpha"])
+```
 
 For a list of available functions.
 

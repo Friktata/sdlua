@@ -1,2 +1,4 @@
-./sdlua
-./SDLua_draw
+sdlua
+SDLua_draw
+*.o
+**/*.o

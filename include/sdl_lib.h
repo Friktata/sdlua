@@ -14,6 +14,7 @@
 #include <SDL3_image/SDL_image.h>
 
 #define LUA_ERR_LEN             1024
+#define SDL_CURSORS_MAX         12
 
 int     l_sdl_init              (lua_State *);
 int     l_sdl_quit              (lua_State *);

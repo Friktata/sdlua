@@ -831,9 +831,10 @@ int l_sdl_fullscreen(
  *
  */
 SDL_Cursor *__sdl_get_cursor(
+    APP                         *app,
     const char                  *cursor_name
 ) {
-    const char *sdl_cursor_names[SDL_SYSTEM_CURSOR_COUNT] = {
+    const char *sdl_cursor_names[SDL_CURSORS_MAX] = {
         "arrow",
         "ibeam",
         "wait",
@@ -848,11 +849,14 @@ SDL_Cursor *__sdl_get_cursor(
         "hand"
     };
 
-    static SDL_Cursor *sdl_cursors[SDL_SYSTEM_CURSOR_COUNT] = {NULL};
+    static SDL_Cursor *sdl_cursors[SDL_CURSORS_MAX] = {NULL};
 
-    for (int cursor = 0; cursor < SDL_SYSTEM_CURSOR_COUNT; cursor++) {
+    for (int cursor = 0; cursor < SDL_CURSORS_MAX; cursor++) {
         if (! sdl_cursors[cursor]) {
             sdl_cursors[cursor] = SDL_CreateSystemCursor(cursor);
+            if (app->log) {
+                fprintf(app->log, ">>> Created system cursor %s\n", sdl_cursor_names[cursor]);
+            }
             continue;
         }
 
@@ -889,7 +893,7 @@ int l_sdl_set_cursor(
         cursor_name = "arrow";
     }
 
-    SDL_Cursor *new_cursor = __sdl_get_cursor(cursor_name);
+    SDL_Cursor *new_cursor = __sdl_get_cursor(app, cursor_name);
 
     if (! new_cursor) {
         return __lua_error_msg(state, "SDL_Setcursor(): Unknown cursor reference \"%s\"\n", cursor_name);
@@ -899,10 +903,10 @@ int l_sdl_set_cursor(
     app->cursor = new_cursor;
 
     SDL_SetCursor(new_cursor);
-    
-    if (app->log) {
-        fprintf(app->log, ">>> Set cursor to %s\n", cursor_name);
-    }
+
+    // if (app->log) {
+    //     fprintf(app->log, ">>> Set cursor to %s\n", cursor_name);
+    // }
 
     lua_pushstring(state, "OK");
     return 1;
