@@ -37,6 +37,8 @@ typedef struct __app        {
     SDL_Window              *window;
     SDL_Renderer            *renderer;
     ma_engine               engine;
+    char                    *cursor_name;
+    SDL_Cursor              *cursor;
     SDL_Entity              *hash;
 } APP;
 

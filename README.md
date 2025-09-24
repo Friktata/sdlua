@@ -1,3 +1,98 @@
+### Updates
+
+**update** 24/09/2025
+
+Fixed a bug that was causing a seg-fault when `sdlua` was being invoked via a shebang,
+some path related issues and a weird bug with the `--log --stdout` option.
+
+I also added a couple of new functions:
+
+    ```SDL_Surfaceinfo()```
+    ```SDL_Setcursor()```
+
+The ```SDL_Surfaceinfo()``` function lets us grab information about a surface (**width**,
+**height**, etc).
+
+This is useful because when we create an image or font texture we might not
+necessarily know the area it consumes, we can create an image like this:
+
+```
+    img = {
+        id = "entity_id",
+        image = "path/to/image",
+        x = 100,
+        y = 100,
+        width = 0,
+        height = 0
+    }
+```
+
+Which will load the image at its default dimensions, if we do:
+
+```
+    img = {
+        id = "entity_id",
+        image = "path/to/image",
+        x = 100,
+        y = 100,
+        width = 100,
+        height = 100
+    }
+```
+
+Then the image will be scaled to 100x100 irrespective of what size the
+image actually is.
+
+Problem is we don't know the image size, so we use ```SDL_Surfaceinfo()```
+to get a table describing the surface/texture area:
+
+```
+    img_info = SDL_Surfaceinfo("entity_id")
+
+--  Either returns a table on success or a string containing an
+--  error message on failure.
+    if (type(img_info) ~= "table) then
+        print(img_info)
+        return 1
+    end
+
+--  Update the image dimensions.
+    img["width"] = img_info["width"]
+    img["height"] = img_info["height"]
+```
+
+This also works with ```SDL_Text()``` if you want a font to scale to a width and
+height based on the font size.
+
+We can use ```SDL_Setcursor()``` to set the cursor:
+
+```
+    SDL_Setcursor("hand")
+```
+
+Fairly self explanitory, you will find the full list of **SDL_INIT_, SDL_WINDOW_** and
+**SDL_SYSTEM_CURSOR_** flags towards the bottom of the **src/sdl_lib.c** file.
+
+---
+
+**update** 23/09/2025
+
+Added some new stuff - firstly, more error checking to validate input, functions will
+check to ensure the correct parameters are passed and handle the logging.
+
+Also added a few new functions, specifically:
+
+    ```SDL_Putpixel()```
+    ```SDL_Getpixel()```
+
+See:
+_
+    include/sdl_lib.h
+
+For a list of available functions.
+
+---
+
 # SDLua
 
 SDLua is a fun little scripting engine that provides a handful of useful SDL3 bindings accessible from Lua scripts.
@@ -189,18 +284,3 @@ Also, learning how to build a C app embedding Lua has been educational — still
 
 ---
 
-### Update
-
-Added some new stuff - firstly, more error checking to validate input, functions will
-check to ensure the correct parameters are passed and handle the logging.
-
-Also added a few new functions, specifically:
-
-    `SDL_Putpixel`()
-    `SDL_Getpixel`()
-
-See:
-_
-    include/sdl_lib.h
-
-For a list of available functions.

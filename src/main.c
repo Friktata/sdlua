@@ -31,7 +31,8 @@ int main(
     app.flags = 0;
     app.window = NULL;
     app.renderer = NULL;
-    
+    app.cursor_name = "default";
+
     char *err = sort_args(&app, argc, argv);
 
     if (err) {

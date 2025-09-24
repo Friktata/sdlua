@@ -66,14 +66,6 @@ char *sort_args(
     lua_State *state = NULL;
 
     for (int arg = 1; arg < argc; arg++) {
-        if (strcmp(argv[arg], "--env") == 0) {
-            if (++arg >= argc) {
-                return "Error in sort_args(): The --env option requires a parameter\n";
-            }
-            current_env = argv[arg];
-            continue;
-        }
-
         if (strcmp(argv[arg], "--log") == 0) {
             if (++arg >= argc) {
                 return "Error in sort_args(): The --log option requires a parameter\n";
@@ -113,6 +105,21 @@ char *sort_args(
                     return &err_msg[0];
                 }
             }
+            continue;
+        }
+    }
+
+    for (int arg = 1; arg < argc; arg++) {
+        if ((strcmp(argv[arg], "--log") == 0) || (strcmp(argv[arg], "--err") == 0)) {
+            arg++;
+            continue;
+        }
+        
+        if (strcmp(argv[arg], "--env") == 0) {
+            if (++arg >= argc) {
+                return "Error in sort_args(): The --env option requires a parameter\n";
+            }
+            current_env = argv[arg];
             continue;
         }
 
@@ -167,7 +174,7 @@ char *sort_args(
 
             lua_getfield(state, LUA_REGISTRYINDEX, "__return_status");
 
-            if (!lua_isnil(state, -1)) {
+            if (lua_isnil(state, -1)) {
                 break;
             }
 

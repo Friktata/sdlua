@@ -1,2 +1,2 @@
-luadraw.lua
-sdlua
+./sdlua
+./SDLua_draw

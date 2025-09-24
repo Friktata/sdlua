@@ -320,7 +320,7 @@ int __lua_error_msg(
 ) {
     char err_msg[LUA_ERR_LEN] = {0};
     va_list list;
-
+    
     va_start(list, fmt);
     vsnprintf(err_msg, LUA_ERR_LEN, fmt, list);
     va_end(list);
@@ -830,6 +830,87 @@ int l_sdl_fullscreen(
 /**
  *
  */
+SDL_Cursor *__sdl_get_cursor(
+    const char                  *cursor_name
+) {
+    const char *sdl_cursor_names[SDL_SYSTEM_CURSOR_COUNT] = {
+        "arrow",
+        "ibeam",
+        "wait",
+        "crosshair",
+        "waitarrow",
+        "sizenwse",
+        "sizenesw",
+        "sizewe",
+        "sizens",
+        "sizeall",
+        "no",
+        "hand"
+    };
+
+    static SDL_Cursor *sdl_cursors[SDL_SYSTEM_CURSOR_COUNT] = {NULL};
+
+    for (int cursor = 0; cursor < SDL_SYSTEM_CURSOR_COUNT; cursor++) {
+        if (! sdl_cursors[cursor]) {
+            sdl_cursors[cursor] = SDL_CreateSystemCursor(cursor);
+            continue;
+        }
+
+        if (cursor_name && (strcmp(cursor_name, sdl_cursor_names[cursor]) == 0)) {
+            return sdl_cursors[cursor];
+        }
+    }
+
+    return NULL;
+}
+
+/**
+ *
+ */
+int l_sdl_set_cursor(
+    lua_State                   *state
+) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Setcursor(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Setcursor(): Exactly 1 parameter expected\n");
+    }
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        return __lua_error_msg(state, "SDL_Setcursor(): String expected for first parameter\n");
+    }
+
+    char *cursor_name = (char *) lua_tostring(state, 1);
+
+    if (strcmp(cursor_name, "default") == 0) {
+        cursor_name = "arrow";
+    }
+
+    SDL_Cursor *new_cursor = __sdl_get_cursor(cursor_name);
+
+    if (! new_cursor) {
+        return __lua_error_msg(state, "SDL_Setcursor(): Unknown cursor reference \"%s\"\n", cursor_name);
+    }
+
+    app->cursor_name = cursor_name;
+    app->cursor = new_cursor;
+
+    SDL_SetCursor(new_cursor);
+    
+    if (app->log) {
+        fprintf(app->log, ">>> Set cursor to %s\n", cursor_name);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
 int l_sdl_surface(
     lua_State                   *state
 ) {
@@ -1222,6 +1303,13 @@ int l_sdl_image(
         return __lua_error_msg(state, "SDL_Image(): %s\n", entity_id);
     }
 
+    if (area.w < 1.0f) {
+        area.w = (float) entity->texture->w;
+    }
+    if (area.h < 1.0f) {
+        area.h = (float) entity->texture->h;
+    }
+
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
     memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
 
@@ -1338,6 +1426,7 @@ int l_sdl_text(
     }
 
     entity->surface = TTF_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
+    // entity->surface = SDL_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
 
     if (! entity->surface) {
         return __lua_error_msg(state, "%s", SDL_GetError());
@@ -1349,16 +1438,23 @@ int l_sdl_text(
         return __lua_error_msg(state, "%s", SDL_GetError());
     }
 
+    if (area.w < 1.0f) {
+        area.w = (float) entity->texture->w;
+    }
+    if (area.h < 1.0f) {
+        area.h = (float) entity->texture->h;
+    }
+
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
     memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
 
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL text %s @ %dx%d (%dx%d), font=\"%s\", size=%d, text=\"%s\"\n",
             entity_id,
-            area.x,
-            area.y,
-            area.w,
-            area.h,
+            (int) area.x,
+            (int) area.y,
+            (int) area.w,
+            (int) area.h,
             entity_path,
             entity_size,
             entity_text
@@ -1372,6 +1468,71 @@ int l_sdl_text(
     TTF_CloseFont(font);
 
     lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_surface_info(
+    lua_State                   *state
+) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Surfaceinfo(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Surfaceinfo(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_isstring(state, 1)) {
+        return __lua_error_msg(state, "SDL_Surfaceinfo(): String expected for first parameter\n");
+    }
+
+    const char *entity_id = lua_tostring(state, -1);
+    if (! entity_id) {
+        return 1;
+    }
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    if (! entity) {
+        return __lua_error_msg(state, "SDL_Surfaceinfo(): Entity \"%s\" not found\n", entity_id);
+    }
+
+    if (entity->type != SDL_ENTITY_IMAGE && entity->type != SDL_ENTITY_FONT) {
+        return __lua_error_msg(state, "SDL_Surfaceinfo(): Entity \"%s\" is not a valid surface or texture\n", entity_id);
+    }
+
+    int entity_x, entity_y, entity_width, entity_height;
+
+    // if (entity->texture) {
+        entity_x = (int) entity->area.x;
+        entity_y = (int) entity->area.y;
+        entity_width = (int) entity->area.w;
+        entity_height = (int) entity->area.h;
+    // }
+
+    lua_newtable(state);
+
+    lua_pushnumber(state, entity_x);
+    lua_setfield(state, -2, "x");
+
+    lua_pushnumber(state, entity_y);
+    lua_setfield(state, -2, "y");
+
+    lua_pushnumber(state, entity_width);
+    lua_setfield(state, -2, "width");
+
+    lua_pushnumber(state, entity_height);
+    lua_setfield(state, -2, "height");
+
     return 1;
 }
 
@@ -1410,9 +1571,47 @@ int l_sdl_update(
         return __lua_error_msg(state, "SDL_Update(): Entity \"%s\" not found\n", entity_id);
     }
 
-    char *result = __lua_table_get_area(state, "SDL_Update()", 1, &entity->area);
+    // int entity_x, entity_y, entity_width, entity_height;
+
+    // char *result = __lua_table_get_integer(state, "SDL_Update()", 1, "x", &entity_x);
+    // if (! result) {
+    //     return 1;
+    // }
+    // result = __lua_table_get_integer(state, "SDL_Update()", 1, "y", &entity_x);
+    // if (! result) {
+    //     return 1;
+    // }
+    // result = __lua_table_get_integer(state, "SDL_Update()", 1, "width", &entity_x);
+    // if (! result) {
+    //     return 1;
+    // }
+    // result = __lua_table_get_integer(state, "SDL_Update()", 1, "height", &entity_x);
+    // if (! result) {
+    //     return 1;
+    // }
+
+    // entity->area.x = (float) entity_x;
+    // entity->area.y = (float) entity_y;
+    // entity->area.w = (float) entity_width;
+    // entity->area.h = (float) entity_height;
+
+    SDL_FRect area;
+    char *result = __lua_table_get_area(state, "SDL_Update()", 1, &area);
     if (! result) {
         return 1;
+    }
+
+    memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
+
+    if (app->log) {
+        fprintf(app->log, ">>> Update to %s @ %dx%d (%dx%d): red=%d, green=%d, blue=%d, alpha=%d\n",
+            entity_id,
+            (int) area.x,
+            (int) area.y,
+            (int) area.w,
+            (int) area.h,
+            255, 255, 255, 255
+        );
     }
 
     lua_pushstring(state, "OK");
@@ -1868,4 +2067,87 @@ void reg_sdl_win_flags(
     
     lua_pushinteger(state, SDL_WINDOW_METAL);
     lua_setglobal(state, "SDL_WINDOW_METAL");
+}
+
+/**
+ *
+ */
+// void reg_sdl_cursor_types(
+//     lua_State                   *state
+// ) {
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_ARROW);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_ARROW");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_IBEAM);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_IBEAM");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_WAIT);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_WAIT");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_CROSSHAIR);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_CROSSHAIR");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_WAITARROW);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_WAITARROW");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZENWSE);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZENWSE");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZENESW);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZENESW");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZEWE);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZEWE");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZENS);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZENS");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZEALL);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZEALL");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_NO);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_NO");
+
+//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_HAND);
+//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_HAND");
+// }
+
+void reg_sdl_cursor_types(
+    lua_State                   *state
+) {
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_DEFAULT);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_DEFAULT");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_TEXT);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_TEXT");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_WAIT);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_WAIT");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_CROSSHAIR);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_CROSSHAIR");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_PROGRESS);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_PROGRESS");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_NWSE_RESIZE);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_NWSE_RESIZE");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_NESW_RESIZE);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_NESW_RESIZE");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_EW_RESIZE);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_EW_RESIZE");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_NS_RESIZE);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_NS_RESIZE");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_MOVE);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_MOVE");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_NOT_ALLOWED);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_NOT_ALLOWED");
+
+    lua_pushinteger(state, SDL_SYSTEM_CURSOR_POINTER);
+    lua_setglobal(state, "SDL_SYSTEM_CURSOR_POINTER");
 }
