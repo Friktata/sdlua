@@ -7,8 +7,8 @@ some path related issues and a weird bug with the `--log --stdout` option.
 
 I also added a couple of new functions:
 
-    ```SDL_Surfaceinfo()```
-    ```SDL_Setcursor()```
+    SDL_Surfaceinfo()
+    SDL_Setcursor()
 
 The ```SDL_Surfaceinfo()``` function lets us grab information about a surface (**width**,
 **height**, etc).
@@ -82,8 +82,8 @@ check to ensure the correct parameters are passed and handle the logging.
 
 Also added a few new functions, specifically:
 
-    ```SDL_Putpixel()```
-    ```SDL_Getpixel()```
+    SDL_Putpixel()
+    SDL_Getpixel()
 
 See:
 _
