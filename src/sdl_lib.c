@@ -149,7 +149,9 @@ char *__sdl_surface_put_pixel(
             break;
     }
 
-    SDL_UnlockSurface(surface);
+    if (SDL_MUSTLOCK(surface)) {
+        SDL_UnlockSurface(surface);
+    }
 
     return NULL;
 }
@@ -281,6 +283,38 @@ static void __sdl_mouse_button_event(
 
     lua_pushstring(state, "y");
     lua_pushinteger(state, btn->y);
+    lua_settable(state, -3);
+}
+
+
+static void __sdl_mouse_wheel_event(
+    lua_State                   *state,
+    const SDL_MouseWheelEvent   *wheel
+) {
+    lua_newtable(state);
+
+    lua_pushstring(state, "type");
+    lua_pushstring(state, "mouse_wheel");
+    lua_settable(state, -3);
+
+    lua_pushstring(state, "x");
+    lua_pushnumber(state, wheel->x);
+    lua_settable(state, -3);
+
+    lua_pushstring(state, "y");
+    lua_pushnumber(state, wheel->y);
+    lua_settable(state, -3);
+
+    lua_pushstring(state, "mouse_x");
+    lua_pushinteger(state, wheel->mouse_x);
+    lua_settable(state, -3);
+
+    lua_pushstring(state, "mouse_y");
+    lua_pushinteger(state, wheel->mouse_y);
+    lua_settable(state, -3);
+
+    lua_pushstring(state, "direction");
+    lua_pushinteger(state, wheel->direction);
     lua_settable(state, -3);
 }
 
@@ -636,6 +670,9 @@ int l_sdl_poll(
             case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
                 event_name = "windowed";
                 break;
+            case SDL_EVENT_WINDOW_RESIZED:
+                event_name = "resize";
+                break;
             case SDL_EVENT_QUIT:
                 event_name = "quit";
                 break;
@@ -653,6 +690,9 @@ int l_sdl_poll(
                 break;
             case SDL_EVENT_MOUSE_MOTION:
                 event_name = "mousemove";
+                break;
+            case SDL_EVENT_MOUSE_WHEEL:
+                event_name = "mousewheel";
                 break;
             default:
                 continue;
@@ -677,11 +717,15 @@ __lbl_add_event:
             case SDL_EVENT_MOUSE_BUTTON_UP:
                 __sdl_mouse_button_event(state, &event.button);
                 break;
+            case SDL_EVENT_MOUSE_WHEEL:
+                __sdl_mouse_wheel_event(state, &event.wheel);
+                break;
             case SDL_EVENT_MOUSE_MOTION:
                 __sdl_mouse_motion_event(state, &event.motion);
                 break;
             case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
             case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+            case SDL_EVENT_WINDOW_RESIZED:
             case SDL_EVENT_QUIT:
                 lua_newtable(state);
                 break;
@@ -849,7 +893,22 @@ SDL_Cursor *__sdl_get_cursor(
         "hand"
     };
 
-    static SDL_Cursor *sdl_cursors[SDL_CURSORS_MAX] = {NULL};
+    const char *sdl_custom_cursors[SDL_CUSTOM_CURSORS] = {
+        "pencil_tool",
+        "eraser_tool",
+        "bucket_tool",
+        "picker_tool"
+    };
+
+    const char *sdl_cursor_paths[SDL_CUSTOM_CURSORS] = {
+        "./images/icons/pencil.png",
+        "./images/icons/eraser.png",
+        "./images/icons/bucket.png",
+        "./images/icons/picker.png"
+    };
+
+    static SDL_Cursor *sdl_cursors[SDL_CURSORS_MAX] = { NULL };
+    static SDL_Cursor *sdl_custom[SDL_CUSTOM_CURSORS] = { NULL };
 
     for (int cursor = 0; cursor < SDL_CURSORS_MAX; cursor++) {
         if (! sdl_cursors[cursor]) {
@@ -862,6 +921,46 @@ SDL_Cursor *__sdl_get_cursor(
 
         if (cursor_name && (strcmp(cursor_name, sdl_cursor_names[cursor]) == 0)) {
             return sdl_cursors[cursor];
+        }
+    }
+
+    for (int cursor = 0; cursor < SDL_CUSTOM_CURSORS; cursor++) {
+        if (! sdl_custom[cursor]) {
+            SDL_Surface *surface = IMG_Load(sdl_cursor_paths[cursor]);
+            if (! surface) {
+                fprintf(stderr, "Error loading icons: %s\n", SDL_GetError());
+                return NULL;
+            }
+
+            SDL_Surface *resized = SDL_CreateSurface(24, 24, SDL_PIXELFORMAT_RGBA32);
+            if (!resized) {
+                fprintf(stderr, "Failed to create surface: %s", SDL_GetError());
+                SDL_DestroySurface(surface);
+                return false;
+            }
+
+            if (!SDL_BlitSurfaceScaled(surface, NULL, resized, NULL, SDL_SCALEMODE_LINEAR)) {
+                fprintf(stderr, "Scaling failed: %s", SDL_GetError());
+                SDL_DestroySurface(surface);
+                SDL_DestroySurface(resized);
+                return false;
+            }
+
+            SDL_DestroySurface(surface);
+            sdl_custom[cursor] = SDL_CreateColorCursor(resized, 0, 23);
+            
+            if (! sdl_custom[cursor]) {
+                fprintf(stderr, "Error loading icons: %s\n", SDL_GetError());
+                return NULL;
+            }
+            
+            if (app->log) {
+                fprintf(app->log, ">>> Loaded custom cursor %s\n", sdl_cursor_paths[cursor]);
+            }
+        }
+
+        if (strcmp(cursor_name, sdl_custom_cursors[cursor]) == 0) {
+            return sdl_custom[cursor];
         }
     }
 
@@ -903,10 +1002,6 @@ int l_sdl_set_cursor(
     app->cursor = new_cursor;
 
     SDL_SetCursor(new_cursor);
-
-    // if (app->log) {
-    //     fprintf(app->log, ">>> Set cursor to %s\n", cursor_name);
-    // }
 
     lua_pushstring(state, "OK");
     return 1;
@@ -1079,7 +1174,16 @@ int l_sdl_put_pixel(
             lua_pushstring(state, err);
             return 1;
         }
+        fprintf(stdout, "UPDATING SURFACE...\n\n");
     }
+
+    fprintf(stdout, "Putpixel %d,%d,%d,%d\n",
+        (int) rgba.r,
+        (int) rgba.g,
+        (int) rgba.b,
+        (int) rgba.a
+    );
+    fflush(stdout);
 
     lua_pushstring(state, "OK");
     return 1;
@@ -1207,14 +1311,13 @@ int l_sdl_texture(
     if (entity->texture) {
         SDL_DestroyTexture(entity->texture);
         entity->texture = NULL;
+        if (app->log) {
+            fprintf(app->log, ">>> Destroyed existing texture %s\n", entity_id);
+        }
     }
 
     if ((entity->texture = SDL_CreateTextureFromSurface(app->renderer, entity->surface)) == NULL) {
-        return __lua_error_msg(state, "SDL_Texture(): %s\n", entity_id);
-    }
-
-    if (app->log) {
-        fprintf(app->log, ">>> Destroyed existing texture %s\n", entity_id);
+        return __lua_error_msg(state, "SDL_Texture(): %s\n", SDL_GetError());
     }
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
@@ -1223,10 +1326,10 @@ int l_sdl_texture(
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL texture %s @ %dx%d (%dx%d)\n",
             entity_id,
-            area.x,
-            area.y,
-            area.w,
-            area.h
+            (int) area.x,
+            (int) area.y,
+            (int) area.w,
+            (int) area.h
         );
     }
 
@@ -1300,11 +1403,11 @@ int l_sdl_image(
     }
 
     if ((entity->surface = IMG_Load(entity_path)) == NULL) {
-        return __lua_error_msg(state, "SDL_Image(): %s\n", entity_id);
+        return __lua_error_msg(state, "SDL_Image(): %s\n", SDL_GetError());
     }
 
     if ((entity->texture = SDL_CreateTextureFromSurface(app->renderer, entity->surface)) == NULL) {
-        return __lua_error_msg(state, "SDL_Image(): %s\n", entity_id);
+        return __lua_error_msg(state, "SDL_Image(): %s\n", SDL_GetError());
     }
 
     if (area.w < 1.0f) {
@@ -1926,7 +2029,7 @@ int l_sdl_render(
     char err_msg[LUA_ERR_LEN];
 
     SDL_Entity *entity;
-
+    
     if (! (app->flags & APP_F_SDLINIT)) {
         return __lua_error_msg(state, "SDL_Render(): SDL not initialised");
     }
@@ -1947,6 +2050,16 @@ int l_sdl_render(
 
     if (! entity) {
         return __lua_error_msg(state, "SDL_Texture(): Entity \"%s\" not found\n", entity_id);
+    }
+
+    if (app->log) {
+        fprintf(app->log, "Rendering texture %s @ %dx%d (%dx%d)\n",
+            entity_id,
+            (int) entity->area.x,
+            (int) entity->area.y,
+            (int) entity->area.w,
+            (int) entity->area.h
+        );
     }
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &entity->area);
@@ -2072,49 +2185,6 @@ void reg_sdl_win_flags(
     lua_pushinteger(state, SDL_WINDOW_METAL);
     lua_setglobal(state, "SDL_WINDOW_METAL");
 }
-
-/**
- *
- */
-// void reg_sdl_cursor_types(
-//     lua_State                   *state
-// ) {
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_ARROW);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_ARROW");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_IBEAM);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_IBEAM");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_WAIT);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_WAIT");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_CROSSHAIR);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_CROSSHAIR");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_WAITARROW);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_WAITARROW");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZENWSE);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZENWSE");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZENESW);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZENESW");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZEWE);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZEWE");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZENS);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZENS");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_SIZEALL);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_SIZEALL");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_NO);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_NO");
-
-//     lua_pushinteger(state, SDL_SYSTEM_CURSOR_HAND);
-//     lua_setglobal(state, "SDL_SYSTEM_CURSOR_HAND");
-// }
 
 void reg_sdl_cursor_types(
     lua_State                   *state

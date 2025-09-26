@@ -59,6 +59,12 @@ to get a table describing the surface/texture area:
 --  Update the image dimensions.
     img["width"] = img_info["width"]
     img["height"] = img_info["height"]
+
+--  We have to update the entity with the new values, this
+--  means we don't need to destroy and create new entities,
+--  we can just call SDL_Render("entity_id") and it will
+--  reflect the changes. 
+    SDL_Update(img)
 ```
 
 This also works with ```SDL_Text()``` if you want a font to scale to a width and
