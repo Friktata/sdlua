@@ -24,6 +24,8 @@ typedef struct __scriptenv {
     int                     size;
     lua_State               *state;
     unsigned char           flags;
+    char                    **argv;
+    int                     argc;
 } SCRIPTENV;
 
 typedef struct __scripts {

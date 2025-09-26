@@ -81,6 +81,7 @@ char *exec_concurrent(
         luaL_openlibs(state);
     }
     if (flags & SCRIPTS_F_EXTLIBS) {
+        fprintf(stdout, ">>> EXTLIBS included\n\n");
         register_lib(&ext_lib[0], state);
     }
     if (flags & SCRIPTS_F_SDLLIBS) {

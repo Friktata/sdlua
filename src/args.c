@@ -65,6 +65,8 @@ char *sort_args(
 
     lua_State *state = NULL;
 
+    app->argv = malloc(sizeof(char *) * argc);
+
     for (int arg = 1; arg < argc; arg++) {
         if (strcmp(argv[arg], "--log") == 0) {
             if (++arg >= argc) {
@@ -135,6 +137,15 @@ char *sort_args(
                     return err;
                 }
             }
+            continue;
+        }
+
+        if (strcmp(argv[arg], "--arg") == 0) {
+            if (++arg >= argc) {
+                return "Error in sort_args(): The --arg option requires a parameter\n";
+            }
+            app->argv[app->argc] = argv[arg];
+            app->argc++;
             continue;
         }
 

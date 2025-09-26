@@ -81,6 +81,8 @@ char *scriptenv_new(
     scripts->scriptenv[index]->size = 0;
     scripts->scriptenv[index]->state = luaL_newstate();
     scripts->scriptenv[index]->flags = flags;
+    scripts->scriptenv[index]->argv = NULL;
+    scripts->scriptenv[index]->argc = 0;
 
     return NULL;
 }

@@ -28,6 +28,8 @@ typedef struct __app        {
     FILE                    *err;
     char                    err_msg[APP_ERRMSG_LEN];
     SCRIPTS                 scripts;
+    char                    **argv;
+    int                     argc;
     SDL_Entity              **entity;
     int                     entities;
     unsigned char           flags;

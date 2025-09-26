@@ -1,5 +1,45 @@
 ### Updates
 
+
+**update** 26/09/2025
+
+Fixed some bugs and other small issues.
+
+Added the **scroll** mouse event, we can now do:
+
+```
+    SDL_Event("scroll", function(event)
+        --  event.y will be 1 (scroll up) or -1 (scroll down)
+        --
+        --  We can also get the mouse position with event.mouse_x
+        --  and event.mouse_y
+    end)
+```
+
+I also added a way to pass command line arguments to scripts, it's a
+bit cumbersome right now but you can use `--arg <value>` to set a
+parameter for the script environment, these are indexed starting at 0:
+
+```
+    sdlua script_name --arg my_file.txt
+```
+
+This will make "my_file.txt" available in the environment, we can use
+the `arg()` function to manage arguments.
+
+```
+    --  arg() with no parameters returns the argument count
+    arg_count = arg()
+    
+    --  Or we can specify the index of an argument we want to reference,
+    --  indexes in this case are 0-based.
+    argv_0 = arg(0)
+    argv_1 = arg(1)
+    ...etc...
+```
+
+---
+
 **update** 24/09/2025
 
 Fixed a bug that was causing a seg-fault when `sdlua` was being invoked via a shebang,

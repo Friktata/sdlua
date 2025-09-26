@@ -13,6 +13,8 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
 
+#include "lua_lib.h"
+
 #define LUA_ERR_LEN             1024
 
 #define SDL_CURSORS_MAX         12

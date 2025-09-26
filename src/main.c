@@ -26,6 +26,8 @@ int main(
     app.err = stderr;
     app.err_msg[0] = '\0';
     app.scripts = scripts_new(0);
+    app.argv = NULL;
+    app.argc = 0;
     app.entity = NULL;
     app.entities = 0;
     app.flags = 0;
@@ -56,6 +58,13 @@ __lbl_main_error:
 __lbl_main_cleanup:
 
     scripts_free(&app.scripts);
+
+    if (app.argv) {
+        free(app.argv);
+        app.argv = NULL;
+        app.argc = 0;
+    }
+    
     app_cleanup(&app);
 
     if (app.log && (app.log != stdout && app.log != stderr)) {
