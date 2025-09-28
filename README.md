@@ -2,6 +2,67 @@
 
 **update** 28/09/2025
 
+**SDLK_**
+
+I added some SDL keyboard key codes - see:
+
+    src/sdl_lib.h
+
+You'll find them along with various other SDL specific values/flags that
+are exposed in the Lua environment when our scripts execute.
+
+You can handle keyboard events easily using the ```SDL_Event``` and ```SDL_Poll```
+functions. Here's a simple app with a main loop that will exit if either the **Q**
+or **Escape** keys are pressed.
+
+```
+    local app_running = true
+
+    -- Define a callback for the keydown event.
+    SDL_Event("keydown", function(event)
+        if (event.key == SDLK_Q or event.key == SDLK_ESCAPE) then
+            app_running = false
+        end
+
+        -- Alternatively you can use event.char...
+        --
+        -- if (event.char == 'q' or event.key == SDLK_ESCAPE) then
+        --     app_running = false
+        -- end
+    end)
+
+    -- Main loop.
+    while (app_running) do
+
+        SDL_Clear()                     -- Clear the window
+        SDL_Render(my_surface["id"])    -- Render something
+        SDL_Present()                   -- Redraw the display
+
+        SDL_Poll()                      -- Poll for events
+
+        SDL_Delay(32)                   -- Delay in milliseconds
+
+    end
+```
+
+I also moved the SDLua_demo.lua script and related scripts into:
+
+    demo/
+
+Just to tidy things up, this makes running the script a bit of a pain, here's
+the command if you want to just copy and paste to test it:
+
+    ./sdlua \
+        demo/SDLua_demo.lua \
+        demo/SDLua_audio.lua \
+        demo/SDLua_icon.lua \
+        demo/SDLua_surface.lua \
+        demo/SDLua_font.lua \
+        demo/SDLua_events.lua \
+        demo/SDLua_loop.lua \
+        demo/SDLua_quit.lua 
+
+
 Added a few new features. I've been building an image editor (**SDLua_draw**)
 which is basically a simply **MS Paint** clone. We can use it to create and edit
 various formats.
