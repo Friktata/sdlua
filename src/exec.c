@@ -88,6 +88,7 @@ char *exec_concurrent(
         reg_sdl_init_flags(state);
         reg_sdl_win_flags(state);
         reg_sdl_cursor_types(state);
+        reg_sdl_keycodes(state);
     }
 
     char *base_path = __get_script_directory(path);

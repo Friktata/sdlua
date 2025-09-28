@@ -1056,7 +1056,7 @@ int l_sdl_pushsurface(
     if (lua_gettop(state) > 2) {
         if (lua_type(state, 3) != LUA_TNUMBER) {
             lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): Integer expected for third parameter\n"));
-            return 1
+            return 1;
         }
 
         stack_size = lua_tointeger(state, 3);
@@ -2458,4 +2458,226 @@ void reg_sdl_cursor_types(
 
     lua_pushinteger(state, SDL_SYSTEM_CURSOR_POINTER);
     lua_setglobal(state, "SDL_SYSTEM_CURSOR_POINTER");
+}
+
+void reg_sdl_keycodes(
+    lua_State                   *state
+) {
+    lua_pushinteger(state, SDLK_RETURN);
+    lua_setglobal(state, "SDLK_RETURN");
+
+    lua_pushinteger(state, SDLK_ESCAPE);
+    lua_setglobal(state, "SDLK_ESCAPE");
+
+    lua_pushinteger(state, SDLK_BACKSPACE);
+    lua_setglobal(state, "SDLK_BACKSPACE");
+
+    lua_pushinteger(state, SDLK_TAB);
+    lua_setglobal(state, "SDLK_TAB");
+
+    lua_pushinteger(state, SDLK_SPACE);
+    lua_setglobal(state, "SDLK_SPACE");
+
+    lua_pushinteger(state, SDLK_DELETE);
+    lua_setglobal(state, "SDLK_DELETE");
+
+    lua_pushinteger(state, SDLK_INSERT);
+    lua_setglobal(state, "SDLK_INSERT");
+
+    lua_pushinteger(state, SDLK_HOME);
+    lua_setglobal(state, "SDLK_HOME");
+
+    lua_pushinteger(state, SDLK_END);
+    lua_setglobal(state, "SDLK_END");
+
+    lua_pushinteger(state, SDLK_PAGEUP);
+    lua_setglobal(state, "SDLK_PAGEUP");
+
+    lua_pushinteger(state, SDLK_PAGEDOWN);
+    lua_setglobal(state, "SDLK_PAGEDOWN");
+
+    // Arrow keys
+    lua_pushinteger(state, SDLK_LEFT);
+    lua_setglobal(state, "SDLK_LEFT");
+
+    lua_pushinteger(state, SDLK_RIGHT);
+    lua_setglobal(state, "SDLK_RIGHT");
+
+    lua_pushinteger(state, SDLK_UP);
+    lua_setglobal(state, "SDLK_UP");
+
+    lua_pushinteger(state, SDLK_DOWN);
+    lua_setglobal(state, "SDLK_DOWN");
+
+    // Function keys
+    lua_pushinteger(state, SDLK_F1);
+    lua_setglobal(state, "SDLK_F1");
+
+    lua_pushinteger(state, SDLK_F2);
+    lua_setglobal(state, "SDLK_F2");
+
+    lua_pushinteger(state, SDLK_F3);
+    lua_setglobal(state, "SDLK_F3");
+
+    lua_pushinteger(state, SDLK_F4);
+    lua_setglobal(state, "SDLK_F4");
+
+    lua_pushinteger(state, SDLK_F5);
+    lua_setglobal(state, "SDLK_F5");
+
+    lua_pushinteger(state, SDLK_F6);
+    lua_setglobal(state, "SDLK_F6");
+
+    lua_pushinteger(state, SDLK_F7);
+    lua_setglobal(state, "SDLK_F7");
+
+    lua_pushinteger(state, SDLK_F8);
+    lua_setglobal(state, "SDLK_F8");
+
+    lua_pushinteger(state, SDLK_F9);
+    lua_setglobal(state, "SDLK_F9");
+
+    lua_pushinteger(state, SDLK_F10);
+    lua_setglobal(state, "SDLK_F10");
+
+    lua_pushinteger(state, SDLK_F11);
+    lua_setglobal(state, "SDLK_F11");
+
+    lua_pushinteger(state, SDLK_F12);
+    lua_setglobal(state, "SDLK_F12");
+
+    // Modifier keys (optional)
+    lua_pushinteger(state, SDLK_LCTRL);
+    lua_setglobal(state, "SDLK_LCTRL");
+
+    lua_pushinteger(state, SDLK_RCTRL);
+    lua_setglobal(state, "SDLK_RCTRL");
+
+    lua_pushinteger(state, SDLK_LSHIFT);
+    lua_setglobal(state, "SDLK_LSHIFT");
+
+    lua_pushinteger(state, SDLK_RSHIFT);
+    lua_setglobal(state, "SDLK_RSHIFT");
+
+    lua_pushinteger(state, SDLK_LALT);
+    lua_setglobal(state, "SDLK_LALT");
+
+    lua_pushinteger(state, SDLK_RALT);
+    lua_setglobal(state, "SDLK_RALT");
+
+    lua_pushinteger(state, SDLK_LGUI);
+    lua_setglobal(state, "SDLK_LGUI");
+
+    lua_pushinteger(state, SDLK_RGUI);
+    lua_setglobal(state, "SDLK_RGUI");
+
+    // Alphabet/digits 0-9
+    lua_pushinteger(state, SDLK_A);
+    lua_setglobal(state, "SDLK_A");
+
+    lua_pushinteger(state, SDLK_B);
+    lua_setglobal(state, "SDLK_B");
+
+    lua_pushinteger(state, SDLK_C);
+    lua_setglobal(state, "SDLK_C");
+
+    lua_pushinteger(state, SDLK_D);
+    lua_setglobal(state, "SDLK_D");
+
+    lua_pushinteger(state, SDLK_E);
+    lua_setglobal(state, "SDLK_E");
+
+    lua_pushinteger(state, SDLK_F);
+    lua_setglobal(state, "SDLK_F");
+
+    lua_pushinteger(state, SDLK_G);
+    lua_setglobal(state, "SDLK_G");
+
+    lua_pushinteger(state, SDLK_H);
+    lua_setglobal(state, "SDLK_H");
+
+    lua_pushinteger(state, SDLK_I);
+    lua_setglobal(state, "SDLK_I");
+
+    lua_pushinteger(state, SDLK_J);
+    lua_setglobal(state, "SDLK_J");
+
+    lua_pushinteger(state, SDLK_K);
+    lua_setglobal(state, "SDLK_K");
+
+    lua_pushinteger(state, SDLK_L);
+    lua_setglobal(state, "SDLK_L");
+
+    lua_pushinteger(state, SDLK_M);
+    lua_setglobal(state, "SDLK_M");
+
+    lua_pushinteger(state, SDLK_N);
+    lua_setglobal(state, "SDLK_N");
+
+    lua_pushinteger(state, SDLK_O);
+    lua_setglobal(state, "SDLK_O");
+
+    lua_pushinteger(state, SDLK_P);
+    lua_setglobal(state, "SDLK_P");
+
+    lua_pushinteger(state, SDLK_Q);
+    lua_setglobal(state, "SDLK_Q");
+
+    lua_pushinteger(state, SDLK_R);
+    lua_setglobal(state, "SDLK_R");
+
+    lua_pushinteger(state, SDLK_S);
+    lua_setglobal(state, "SDLK_S");
+
+    lua_pushinteger(state, SDLK_T);
+    lua_setglobal(state, "SDLK_T");
+
+    lua_pushinteger(state, SDLK_U);
+    lua_setglobal(state, "SDLK_U");
+
+    lua_pushinteger(state, SDLK_V);
+    lua_setglobal(state, "SDLK_V");
+
+    lua_pushinteger(state, SDLK_W);
+    lua_setglobal(state, "SDLK_W");
+
+    lua_pushinteger(state, SDLK_X);
+    lua_setglobal(state, "SDLK_X");
+
+    lua_pushinteger(state, SDLK_Y);
+    lua_setglobal(state, "SDLK_Y");
+
+    lua_pushinteger(state, SDLK_Z);
+    lua_setglobal(state, "SDLK_Z");
+
+    lua_pushinteger(state, SDLK_0);
+    lua_setglobal(state, "SDLK_0");
+
+    lua_pushinteger(state, SDLK_1);
+    lua_setglobal(state, "SDLK_1");
+
+    lua_pushinteger(state, SDLK_2);
+    lua_setglobal(state, "SDLK_2");
+
+    lua_pushinteger(state, SDLK_3);
+    lua_setglobal(state, "SDLK_3");
+
+    lua_pushinteger(state, SDLK_4);
+    lua_setglobal(state, "SDLK_4");
+
+    lua_pushinteger(state, SDLK_5);
+    lua_setglobal(state, "SDLK_5");
+
+    lua_pushinteger(state, SDLK_6);
+    lua_setglobal(state, "SDLK_6");
+
+    lua_pushinteger(state, SDLK_7);
+    lua_setglobal(state, "SDLK_7");
+
+    lua_pushinteger(state, SDLK_8);
+    lua_setglobal(state, "SDLK_8");
+
+    lua_pushinteger(state, SDLK_9);
+    lua_setglobal(state, "SDLK_9");
+
 }

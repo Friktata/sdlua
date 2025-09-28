@@ -95,5 +95,6 @@ static const struct luaL_Reg sdl_lib[] = {
 void    reg_sdl_init_flags      (lua_State *);
 void    reg_sdl_win_flags       (lua_State *);
 void    reg_sdl_cursor_types    (lua_State *);
+void    reg_sdl_keycodes        (lua_State *);
 
 #endif
