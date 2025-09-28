@@ -4,8 +4,8 @@
  *
  */
 SDL_Surface *__sdl_copy_surface(
-    SDL_Surface *surface,
-    char *err_msg
+    SDL_Surface                 *surface,
+    char                        *err_msg
 ) {
     if (!surface) {
         return NULL;
