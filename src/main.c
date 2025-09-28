@@ -1,5 +1,9 @@
+
+#define _POSIX_C_SOURCE 200809L
+
 #include "../include/app.h"
 #include "../include/args.h"
+#include "../include/sdl_stacks.h"
 
 #include "../lib/miniaudio/dr_mp3.h"
 
@@ -30,10 +34,14 @@ int main(
     app.argc = 0;
     app.entity = NULL;
     app.entities = 0;
+    app.stacks.stack = NULL;
+    app.stacks.size = 0;
+    app.stacks.hash = NULL;
     app.flags = 0;
     app.window = NULL;
     app.renderer = NULL;
     app.cursor_name = "default";
+    app.hash = NULL;
 
     char *err = sort_args(&app, argc, argv);
 
@@ -64,7 +72,7 @@ __lbl_main_cleanup:
         app.argv = NULL;
         app.argc = 0;
     }
-    
+
     app_cleanup(&app);
 
     if (app.log && (app.log != stdout && app.log != stderr)) {

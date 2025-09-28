@@ -1,4 +1,5 @@
 #include "../include/sdl_lib.h"
+#include "../include/sdl_stacks.h"
 
 #include "../include/scripts.h"
 #include "../include/app.h"
@@ -24,67 +25,63 @@ char *__sdl_error_msg(
 
 /**
  *
- */
-char *__sdl_entity(
-    APP                         *app,
-    const char                  *entity_id
-) {
+ */char *__sdl_entity(APP *app, const char *entity_id) {
     static int index = 0;
 
     SDL_Entity **entity = app->entity;
     int entities = app->entities;
 
-    if (! entity) {
-        if ((entity = malloc(sizeof(SDL_Entity *))) == NULL) {
-            return __sdl_error_msg("malloc() error in __new_sql_entity(): %s\n", strerror(errno));
+    if (!entity) {
+        entity = malloc(sizeof(SDL_Entity *));
+        if (!entity) {
+            return __sdl_error_msg("malloc() error in __sdl_entity(): %s", strerror(errno));
         }
         entities = 0;
     }
     else {
-        SDL_Entity **new_entities = realloc(entity, (sizeof(SDL_Entity *) * (entities + 1)));
-
-        if (! new_entities) {
-            return __sdl_error_msg("realloc() error in __new_sql_entity(): %s\n", strerror(errno));
+        SDL_Entity **new_entities = realloc(entity, sizeof(SDL_Entity *) * (entities + 1));
+        if (!new_entities) {
+            return __sdl_error_msg("realloc() error in __sdl_entity(): %s", strerror(errno));
         }
-
         entity = new_entities;
     }
 
-    if ((entity[entities] = malloc(sizeof(SDL_Entity))) == NULL) {
-        free(entity);
-        entity = NULL;
-        return __sdl_error_msg("malloc() error in __new_sql_entity(): %s\n", strerror(errno));
+    SDL_Entity *e = malloc(sizeof(SDL_Entity));
+    if (!e) {
+        return __sdl_error_msg("malloc() error in __sdl_entity(): %s", strerror(errno));
     }
 
-    entity[entities]->type = SDL_ENTITY_EMPTY;
-    entity[entities]->index = index++;
-    entity[entities]->surface = NULL;
-    entity[entities]->texture = NULL;
-
-    if ((entity[entities]->id = malloc(strlen(entity_id) + 1)) == NULL) {
-        free(entity);
-        entity = NULL;
-        return __sdl_error_msg("malloc() error in __new_sql_entity(): %s\n", strerror(errno));
+    e->id = strdup(entity_id);
+    if (!e->id) {
+        free(e);
+        return __sdl_error_msg("strdup() error in __sdl_entity(): %s", strerror(errno));
     }
 
-    snprintf(entity[entities]->id, (strlen(entity_id) + 1), "%s", entity_id);
+    e->type = SDL_ENTITY_EMPTY;
+    e->index = index++;
+    e->surface = NULL;
+    e->texture = NULL;
+    e->flags = 0;
+    
+    memset(&e->area, 0, sizeof(SDL_FRect));
+    memset(&e->sound, 0, sizeof(ma_sound));
+    memset(&e->decoder, 0, sizeof(ma_decoder));
+    memset(&e->data, 0, sizeof(e->data));
+
+    entity[entities] = e;
 
     app->entity = entity;
-    app->entities = (entities + 1);
+    app->entities = entities + 1;
 
-    HASH_ADD_KEYPTR(
-        hh, app->hash,
-        app->entity[entities]->id,
-        strlen(app->entity[entities]->id),
-        app->entity[entities]
-    );
+    HASH_ADD_KEYPTR(hh, app->hash, e->id, strlen(e->id), e);
 
     if (app->log) {
-        fprintf(app->log, ">>> Created new SDL_Entity \"%s\"\n", entity_id);
+        fprintf(app->log, ">>> Created new SDL_Entity \"%s\"\n", e->id);
     }
 
     return NULL;
 }
+
 
 /**
  *
@@ -231,6 +228,64 @@ char *__sdl_surface_get_pixel(
 }
 
 /**
+ * Draw a filled circle of given diameter onto the surface.
+ * (x, y) is the center of the circle.
+ * Returns NULL on success, or error message on failure.
+ */
+char *__sdl_surface_fill_circle(
+    SDL_Surface *surface,
+    const int cx,
+    const int cy,
+    const int diameter,
+    uint8_t red,
+    uint8_t green,
+    uint8_t blue,
+    uint8_t alpha
+) {
+    static char err_msg[LUA_ERR_LEN] = {0};
+
+    if (!surface) {
+        return __sdl_error_msg("__sdl_surface_fill_circle: surface is NULL\n");
+    }
+    if (diameter <= 0) {
+        return __sdl_error_msg("__sdl_surface_fill_circle: diameter must be >0\n");
+    }
+
+    // Convert diameter to radius (floating or integer). We'll use int radius.
+    int radius = diameter / 2;
+
+    // Optionally lock surface if needed
+    if (SDL_MUSTLOCK(surface)) {
+        if (SDL_LockSurface(surface) != 0) {
+            return __sdl_error_msg("__sdl_surface_fill_circle: lock failed: %s\n", SDL_GetError());
+        }
+    }
+
+    // Use a simple scanline fill approach:
+    // For each y offset from -radius to +radius
+    for (int dy = -radius; dy <= radius; dy++) {
+        int yy = cy + dy;
+        // Compute horizontal span: x distance = sqrt(r^2 - dy^2)
+        // Use integer math to avoid floating where possible:
+        double dx_f = sqrt((double)radius * radius - (double)dy * dy);
+        int dx = (int)floor(dx_f + 0.5);
+
+        int x_start = cx - dx;
+        int x_end   = cx + dx;
+
+        for (int xx = x_start; xx <= x_end; xx++) {
+            // Put pixel
+            __sdl_surface_put_pixel(surface, xx, yy, red, green, blue, alpha);
+        }
+    }
+
+    if (SDL_MUSTLOCK(surface)) {
+        SDL_UnlockSurface(surface);
+    }
+    return NULL;
+}
+
+/**
  *
  */
 static void __sdl_keyboard_event(
@@ -286,7 +341,9 @@ static void __sdl_mouse_button_event(
     lua_settable(state, -3);
 }
 
-
+/**
+ *
+ */
 static void __sdl_mouse_wheel_event(
     lua_State                   *state,
     const SDL_MouseWheelEvent   *wheel
@@ -529,7 +586,7 @@ int l_sdl_poll(
                 event_name = "mousemove";
                 break;
             case SDL_EVENT_MOUSE_WHEEL:
-                event_name = "mousewheel";
+                event_name = "scroll";
                 break;
             default:
                 continue;
@@ -958,6 +1015,298 @@ int l_sdl_fill_surface(
 /**
  *
  */
+int l_sdl_pushsurface(
+    lua_State                   *state
+) {
+    char err_msg[SDL_ERR_LEN] = "";
+    char *err = NULL;
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    if (lua_gettop(state) < 2) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): At least 2 parameters expected\n"));
+        return 1;
+    }
+
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): String expected for first parameter\n"));
+        return 1;
+    }
+    if (lua_type(state, 2) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): String expected for second parameter\n"));
+        return 1;
+    }
+
+    int stack_size = 100;
+
+    char *stack_id = (char *) lua_tostring(state, 1);
+    char *entity_id = (char *) lua_tostring(state, 2);
+
+    SDL_Entity *entity;
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    SDL_Stack *stack;
+    HASH_FIND_STR(app->stacks.hash, stack_id, stack);
+
+    if (! entity) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): Entity \"%s\" doesn't exist\n", entity_id));
+        return 1;
+    }
+
+    if (lua_gettop(state) > 2) {
+        if (lua_type(state, 3) != LUA_TNUMBER) {
+            lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): Integer expected for third parameter\n"));
+            return 1
+        }
+
+        stack_size = lua_tointeger(state, 3);
+        if (stack_size < 1) {
+            stack_size = 100;
+        }
+    }
+
+    if (! stack) {
+        if ((err = __sdl_stack_new(&app->stacks, stack_id, stack_size)) != NULL) {
+            lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): %s\n", err));
+            return 1;
+        }
+
+        HASH_FIND_STR(app->stacks.hash, stack_id, stack);
+
+        if (! stack) {
+            lua_pushfstring(state, "SDL_Pushsurface(): Error creating stack \"%s\"\n", stack_id);
+            return 1;
+        }
+    }
+
+    if ((err = __sdl_stack_push(&app->stacks, stack_id, entity->surface)) != NULL) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Pushsurface(): %s\n", err));
+        return 1;
+    }
+
+    if (app->log) {
+        fprintf(app->log, ">>> Stacking surface \"%s\" in stack \"%s\"\n", entity_id, stack_id);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_prevsurface(
+    lua_State                   *state
+) {
+    char err_msg[SDL_ERR_LEN];
+    char *err = NULL;
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    if (lua_gettop(state) != 2) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Prevsurface(): Exactly 2 parameters expected\n"));
+        return 1;
+    }
+
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Prevsurface(): String expected for first parameter\n"));
+        return 1;
+    }
+    if (lua_type(state, 2) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Prevsurface(): String expected for second parameter\n"));
+        return 1;
+    }
+
+    char *stack_id = (char *) lua_tostring(state, 1);
+    char *entity_id = (char *) lua_tostring(state, 2);
+
+    SDL_Entity *entity;
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    SDL_Stack *stack;
+    HASH_FIND_STR(app->stacks.hash, stack_id, stack);
+
+    if (! entity) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Prevsurface(): Entity \"%s\" doesn't exist\n", entity_id));
+        return 1;
+    }
+    if (! stack) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Prevsurface(): Stack \"%s\" doesn't exist\n", stack_id));
+        return 1;
+    }
+
+    SDL_Surface *surface = __sdl_stack_prev(&app->stacks, stack_id, &err_msg[0]);
+
+    if (! surface) {
+        if (err_msg[0] != '\0') {
+            lua_pushstring(state, err_msg);
+        }
+        else {
+            lua_pushnil(state);
+        }
+
+        return 1;
+    }
+
+    if (entity->texture) {
+        SDL_DestroyTexture(entity->texture);
+        entity->texture = NULL;
+    }
+    if (entity->surface) {
+        SDL_DestroySurface(entity->surface);
+        entity->surface = NULL;
+    }
+
+    entity->surface = __sdl_copy_surface(surface, &err_msg[0]);
+
+    if (! entity->surface) {
+        if (err_msg[0] != '\0') {
+            lua_pushstring(state, err_msg);
+        }
+        else {
+            lua_pushnil(state);
+        }
+
+        return 1;
+    }
+
+    if (app->log) {
+        fprintf(app->log, ">>> Returning previous surface \"%s\" in stack \"%s\"\n", entity_id, stack_id);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_nextsurface(
+    lua_State                   *state
+) {
+    char err_msg[SDL_ERR_LEN];
+    char *err = NULL;
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    if (lua_gettop(state) != 2) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Nextsurface(): Exactly 2 parameters expected\n"));
+        return 1;
+    }
+
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Nextsurface(): String expected for first parameter\n"));
+        return 1;
+    }
+    if (lua_type(state, 2) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Nextsurface(): String expected for second parameter\n"));
+        return 1;
+    }
+
+    char *stack_id = (char *) lua_tostring(state, 1);
+    char *entity_id = (char *) lua_tostring(state, 2);
+
+    SDL_Entity *entity;
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    SDL_Stack *stack;
+    HASH_FIND_STR(app->stacks.hash, stack_id, stack);
+
+    if (! entity) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Nextsurface(): Entity \"%s\" doesn't exist\n", entity_id));
+        return 1;
+    }
+    if (! stack) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Nextsurface(): Stack \"%s\" doesn't exist\n", stack_id));
+        return 1;
+    }
+
+    SDL_Surface *surface = __sdl_stack_next(&app->stacks, stack_id, &err_msg[0]);
+
+    if (! surface) {
+        if (err_msg[0] != '\0') {
+            lua_pushstring(state, err_msg);
+        }
+        else {
+            lua_pushnil(state);
+        }
+
+        return 1;
+    }
+
+    if (entity->texture) {
+        SDL_DestroyTexture(entity->texture);
+        entity->texture = NULL;
+    }
+    if (entity->surface) {
+        SDL_DestroySurface(entity->surface);
+        entity->surface = NULL;
+    }
+
+    entity->surface = __sdl_copy_surface(surface, &err_msg[0]);
+
+    if (! entity->surface) {
+        if (err_msg[0] != '\0') {
+            lua_pushstring(state, err_msg);
+        }
+        else {
+            lua_pushnil(state);
+        }
+
+        return 1;
+    }
+
+    if (app->log) {
+        fprintf(app->log, ">>> Returning next surface \"%s\" in stack \"%s\"\n", entity_id, stack_id);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_flushsurfaces(
+    lua_State                   *state
+) {
+    char err_msg[SDL_ERR_LEN];
+    char *err = NULL;
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    if (lua_gettop(state) != 1) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Flushsurfaces(): Exactly 2 parameters expected\n"));
+        return 1;
+    }
+
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Flushsurfaces(): String expected for first parameter\n"));
+        return 1;
+    }
+
+    char *stack_id = (char *) lua_tostring(state, 1);
+
+    SDL_Stack *stack;
+    HASH_FIND_STR(app->stacks.hash, stack_id, stack);
+
+    if (! stack) {
+        lua_pushstring(state, __sdl_error_msg("SDL_Flushsurfaces(): Stack \"%s\" doesn't exist\n", stack_id));
+        return 1;
+    }
+
+    if ((err = __sdl_stack_clear(&app->stacks, stack_id)) != NULL) {
+        lua_pushstring(state, err);
+        return 1;
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
 int l_sdl_put_pixel(
     lua_State                   *state
 ) {
@@ -1091,6 +1440,77 @@ int l_sdl_get_pixel(
     lua_pushinteger(state, alpha);
     lua_setfield(state, -2, "alpha");
 
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_circle(
+    lua_State                   *state
+) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Circle(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Circle(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Circle(): Table expected for first parameter\n");
+    }
+
+    char *entity_id = (char *) __lua_table_get_string(state, "SDL_Circle()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    if (! entity) {
+        snprintf(err_msg, SDL_ERR_LEN, "SDL_Circle(): Entity \"%s\" doesn\'t exist\n", entity_id);
+        lua_pushstring(state, err_msg);
+        return 1;
+    }
+
+    int x, y, diameter;
+
+    char *result = __lua_table_get_integer(state, "SDL_Circle()", 1, "x", &x);
+    if (! result) {
+        return 1;
+    }
+    if ((result = __lua_table_get_integer(state, "SDL_Circle()", 1, "y", &y)) == NULL) {
+        return 1;
+    }
+    if ((result = __lua_table_get_integer(state, "SDL_Circle()", 1, "diameter", &diameter)) == NULL) {
+        return 1;
+    }
+
+    SDL_Color rgba;
+
+    if ((result = __lua_table_get_rgba(state, "SDL_Circle()", 1, &rgba)) == NULL) {
+        return 1;
+    }
+
+    __sdl_surface_fill_circle(
+        entity->surface,
+        x,
+        y,
+        diameter,
+        rgba.r,
+        rgba.g,
+        rgba.b,
+        rgba.a
+    );
+
+    lua_pushstring(state, "OK");
     return 1;
 }
 
@@ -1456,12 +1876,10 @@ int l_sdl_surface_info(
 
     int entity_x, entity_y, entity_width, entity_height;
 
-    // if (entity->texture) {
-        entity_x = (int) entity->area.x;
-        entity_y = (int) entity->area.y;
-        entity_width = (int) entity->area.w;
-        entity_height = (int) entity->area.h;
-    // }
+    entity_x = (int) entity->area.x;
+    entity_y = (int) entity->area.y;
+    entity_width = (int) entity->area.w;
+    entity_height = (int) entity->area.h;
 
     lua_newtable(state);
 
@@ -1514,30 +1932,6 @@ int l_sdl_update(
     if (! entity) {
         return __lua_error_msg(state, "SDL_Update(): Entity \"%s\" not found\n", entity_id);
     }
-
-    // int entity_x, entity_y, entity_width, entity_height;
-
-    // char *result = __lua_table_get_integer(state, "SDL_Update()", 1, "x", &entity_x);
-    // if (! result) {
-    //     return 1;
-    // }
-    // result = __lua_table_get_integer(state, "SDL_Update()", 1, "y", &entity_x);
-    // if (! result) {
-    //     return 1;
-    // }
-    // result = __lua_table_get_integer(state, "SDL_Update()", 1, "width", &entity_x);
-    // if (! result) {
-    //     return 1;
-    // }
-    // result = __lua_table_get_integer(state, "SDL_Update()", 1, "height", &entity_x);
-    // if (! result) {
-    //     return 1;
-    // }
-
-    // entity->area.x = (float) entity_x;
-    // entity->area.y = (float) entity_y;
-    // entity->area.w = (float) entity_width;
-    // entity->area.h = (float) entity_height;
 
     SDL_FRect area;
     char *result = __lua_table_get_area(state, "SDL_Update()", 1, &area);
@@ -2023,6 +2417,9 @@ void reg_sdl_win_flags(
     lua_setglobal(state, "SDL_WINDOW_METAL");
 }
 
+/**
+ *
+ */
 void reg_sdl_cursor_types(
     lua_State                   *state
 ) {

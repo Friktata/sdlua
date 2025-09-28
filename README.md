@@ -1,5 +1,134 @@
 ### Updates
 
+**update** 28/09/2025
+
+Added a few new features. I've been building an image editor (**SDLua_draw**)
+which is basically a simply **MS Paint** clone. We can use it to create and edit
+various formats.
+
+I added a few new functions:
+
+```
+    SDL_Circle()
+    SDL_Pushsurface()
+    SDL_Prevsurface()
+    SDL_Nextsurface()
+    SDL_Flushsurfaces()
+```
+
+**SDL_Circle()**
+
+This function is fairly self-explanitory, it lets you draw a circle - here's
+an example:
+
+```
+    SDL_Circle({
+        id = "entity_id",
+        x = 10,
+        y = 10,
+        diameter = 5,
+        red = 255,
+        green = 0,
+        blue = 0,
+        alpha = 255
+    })
+```
+
+This draws a circle at 10x10 with a 5 pixel diameter. Note the x,y co-ordinates
+specifiy the center of the circle to be drawn, not the upper left as you might
+expect - the reason for this is I created the SDL_Circle() function to create the
+pencil tool for my editor so this made most sense.
+
+**Surface stacks**
+
+The other functions:
+
+```
+    SDL_Pushsurface()
+    SDL_Prevsurface()
+    SDL_Nextsurface()
+    SDL_Flushsurfaces()
+```
+
+First - you have to understand how SDLua manages surfaces and textures. When we
+create a surface:
+
+```
+    my_surface = {
+        id = "surface_id",
+        x = 10,
+        y = 20,
+        height = 100,
+        width = 100
+    }
+
+    SDL_Error = SDL_Surface(my_Surface)
+
+    if (SDL_Error ~= "OK") then
+        print("Error: " .. SDL_Error)
+    end
+```
+
+The SDL_Surface function returns a string, "OK" on success or an error message
+on failure. It does not return a surface, those are stored internally within the
+**sdlua** environment. Instead we give the surface an ID which we use to reference
+the surface in our Lua scripts.
+
+Actually, we're creating an SDL_Entity type native to sdlua, this can be anything
+from a basic surface to an audio track, image, or font. These are all entities,
+they're maintained internally within sdlua, we use functions/wrappers to tell
+sdlua what we want to do and with what entity but we don't manage the asset
+directly.
+
+The ```SDL_Stack``` data type allows us to create a surface stack, which is useful
+if we're editing surfaces...like an image editor.
+
+Like entities, stacks have a unique ID, we can create a stack easily by simply
+pushing a surface to it, if the stack doesn't exist it'll be created:
+
+```
+    SDL_Pushsurface("stack_id", "surface_id")
+```
+
+This will create a stack with the default size of 100 surfaces. We can specify a
+size:
+
+```
+    SDL_Pushsurface("stack_id", "surface_id", 500)
+```
+
+And if the stack doesn't exist it'll be created with 500 surfaces.
+
+What this means, internally, is that whatever surface entity **surface_id** points
+to will be pushed to index 0 of the stack named **stack_id**, the SDL_Stack structure
+will keep track of our **position** in the stack, since it's the first element our
+position will be 0.
+
+As we push more elements onto the stack, the stack grows as does our position.
+
+We can use the ```SDL_Prevsurface()``` and ```SDL_Nextsurface()``` functions to shift
+the position in the stack to point to any stored surface, which we can restore:
+
+```
+    SDL_Prevsurface("stack_id", "surface_id")
+    SDL_Texture(my_surface)
+    SDL_Render(my_surface["id"])
+```
+
+```SDL_Prevsurface``` tells sdlua to shift the position back (assuming position > 0)
+and then restore that surface back to the surface with an entity ID of **surface_id**,
+which we can then use to create and render a texture.
+
+Naturally, the ```SDL_Nextsurface``` funtion will increase the position to the right
+assuming position doesn't already point to the top of the stack.
+
+Lastly, the ```SDL_Flushsurfaces``` function will clear all surfaces after the current
+position - i.e it clears everything to the right.
+
+I was able to use these features to build **undo/redo** functionality into my little
+image editor which I'll be uploading as a little demo in the next day or so.
+
+---
 
 **update** 26/09/2025
 
@@ -91,7 +220,7 @@ to get a table describing the surface/texture area:
 
 --  Either returns a table on success or a string containing an
 --  error message on failure.
-    if (type(img_info) ~= "table) then
+    if (type(img_info) ~= "table") then
         print(img_info)
         return 1
     end

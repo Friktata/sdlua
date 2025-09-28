@@ -23,5 +23,6 @@ char        *__lua_table_get_integer    (lua_State *, char *, int, char *, int *
 const char  *__lua_table_get_string     (lua_State *, char *, int, char *);
 char        *__lua_table_get_rgba       (lua_State *, char *, int, SDL_Color *);
 char        *__lua_table_get_area       (lua_State *, char *, int, SDL_FRect *);
+char        *__lua_table_get_coords     (lua_State *, char *, int, SDL_FRect *);
 
 #endif

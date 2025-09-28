@@ -162,3 +162,29 @@ char *__lua_table_get_area(
 
     return "OK";
 }
+
+/**
+ *
+ */
+char *__lua_table_get_coords(
+    lua_State                   *state,
+    char                        *function_name,
+    int                         pos,
+    SDL_FRect                   *area
+) {
+    int x, y, w, h;
+
+    if (! __lua_table_get_integer(state, function_name, pos, "x", &x)) {
+        return NULL;
+    }
+    if (! __lua_table_get_integer(state, function_name, pos, "y", &y)) {
+        return NULL;
+    }
+
+    area->x = x;
+    area->y = y;
+    area->w = 0;
+    area->h = 0;
+
+    return "OK";
+}

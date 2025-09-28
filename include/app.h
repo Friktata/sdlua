@@ -18,6 +18,7 @@
 
 #include "scripts.h"
 #include "sdl_entity.h"
+#include "sdl_stacks.h"
 
 #include "../lib/miniaudio/miniaudio.h"
 
@@ -32,6 +33,7 @@ typedef struct __app        {
     int                     argc;
     SDL_Entity              **entity;
     int                     entities;
+    SDL_Stacks              stacks;
     unsigned char           flags;
 #define APP_F_SDLINIT       0x01
 #define APP_F_TTFINIT       0x02

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c99 -Iinclude -g -lSDL3 -lSDL3_image -lSDL3_ttf -llua -ldl -lpthread -lm #-Wall -Wextra
+CFLAGS = -std=c99 -Iinclude-g -lSDL3 -lSDL3_image -lSDL3_ttf -llua -ldl -lpthread -lm # -fsanitize=address Wall -Wextra
 
 SRC_DIR = src
 INC_DIR = include

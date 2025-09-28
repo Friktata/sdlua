@@ -1,4 +1,4 @@
-#include "app.h"
+#include "../include/app.h"
 
 ma_engine audio_engine;
 
@@ -10,7 +10,8 @@ void app_cleanup(
 ) {
     SDL_Entity *current_entry, *tmp;
 
-   HASH_CLEAR(hh, app->hash);
+    if (app->hash)
+        HASH_CLEAR(hh, app->hash);
 
     if (app->entity) {
         for (int entity = 0; entity < app->entities; entity++) {

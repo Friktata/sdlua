@@ -1,5 +1,8 @@
 #include "../include/lua_store.h"
 
+/**
+ *
+ */
 void l_store_set(
     LuaStore                *store,
     lua_State               *state
@@ -28,6 +31,9 @@ void l_store_set(
     l_store_update(store, state);
 }
 
+/**
+ *
+ */
 void l_store_update(
     LuaStore                *store,
     lua_State               *state

@@ -1,6 +1,11 @@
 #ifndef SDL_LIB_H
 #define SDL_LIB_H
 
+#define _GNU_SOURCE
+
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 
 #include <lua.h>
@@ -33,7 +38,12 @@ int     l_sdl_set_cursor        (lua_State *);
 int     l_sdl_surface           (lua_State *);
 int     l_sdl_put_pixel         (lua_State *);
 int     l_sdl_get_pixel         (lua_State *);
+int     l_sdl_circle            (lua_State *);
 int     l_sdl_fill_surface      (lua_State *);
+int     l_sdl_pushsurface       (lua_State *);
+int     l_sdl_prevsurface       (lua_State *);
+int     l_sdl_nextsurface       (lua_State *);
+int     l_sdl_flushsurfaces     (lua_State *);
 int     l_sdl_texture           (lua_State *);
 int     l_sdl_image             (lua_State *);
 int     l_sdl_text              (lua_State *);
@@ -61,7 +71,12 @@ static const struct luaL_Reg sdl_lib[] = {
     { "SDL_Surface",            l_sdl_surface },
     { "SDL_Putpixel",           l_sdl_put_pixel },
     { "SDL_Getpixel",           l_sdl_get_pixel },
+    { "SDL_Circle",             l_sdl_circle },
     { "SDL_Fill",               l_sdl_fill_surface },
+    { "SDL_Pushsurface",        l_sdl_pushsurface },
+    { "SDL_Prevsurface",        l_sdl_prevsurface },
+    { "SDL_Nextsurface",        l_sdl_nextsurface },
+    { "SDL_Flushsurfaces",      l_sdl_flushsurfaces },
     { "SDL_Texture",            l_sdl_texture },
     { "SDL_Image",              l_sdl_image },
     { "SDL_Text",               l_sdl_text },

@@ -84,6 +84,9 @@ char *entity_set_text(
     return NULL;
 }
 
+/**
+ *
+ */
 char *entity_set_audio(
     SDL_Entity              *entity,
     const char              *audio_path

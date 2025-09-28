@@ -99,28 +99,28 @@ char *scriptenv_add(
     static char err_msg[SCRIPTS_ERR_LEN];
 
     if (! scripts) {
-        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_new(): The SCRIPTS pointer is NULL\n");
+        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_add(): The SCRIPTS pointer is NULL\n");
         return &err_msg[0];
     }
     if (! id) {
-        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_new(): The id pointer is NULL\n");
+        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_add(): The id pointer is NULL\n");
         return &err_msg[0];
     }
     if (! path) {
-        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_new(): The path pointer is NULL\n");
+        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_add(): The path pointer is NULL\n");
         return &err_msg[0];
     }
 
     int index = scriptenv_find(scripts, id);
 
     if (index < 0) {
-        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_new(): Environment \"%s\" doesn\'t exist\n", id);
+        snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_add(): Environment \"%s\" doesn\'t exist\n", id);
         return &err_msg[0];
     }
 
     for (int script = 0; script < scripts->scriptenv[index]->size; script++) {
         if (strcmp(scripts->scriptenv[index]->script[script], path) == 0) {
-            snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_new(): Script \"%s\" included in environment \"%s\" more than once\n", path, id);
+            snprintf(err_msg, SCRIPTS_ERR_LEN, "Error in scriptenv_add(): Script \"%s\" included in environment \"%s\" more than once\n", path, id);
             return &err_msg[0];
         }
     }
