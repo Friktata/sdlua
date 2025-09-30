@@ -228,9 +228,7 @@ char *__sdl_surface_get_pixel(
 }
 
 /**
- * Draw a filled circle of given diameter onto the surface.
- * (x, y) is the center of the circle.
- * Returns NULL on success, or error message on failure.
+ *
  */
 char *__sdl_surface_fill_circle(
     SDL_Surface *surface,
@@ -251,22 +249,16 @@ char *__sdl_surface_fill_circle(
         return __sdl_error_msg("__sdl_surface_fill_circle: diameter must be >0\n");
     }
 
-    // Convert diameter to radius (floating or integer). We'll use int radius.
     int radius = diameter / 2;
 
-    // Optionally lock surface if needed
     if (SDL_MUSTLOCK(surface)) {
         if (SDL_LockSurface(surface) != 0) {
             return __sdl_error_msg("__sdl_surface_fill_circle: lock failed: %s\n", SDL_GetError());
         }
     }
 
-    // Use a simple scanline fill approach:
-    // For each y offset from -radius to +radius
     for (int dy = -radius; dy <= radius; dy++) {
         int yy = cy + dy;
-        // Compute horizontal span: x distance = sqrt(r^2 - dy^2)
-        // Use integer math to avoid floating where possible:
         double dx_f = sqrt((double)radius * radius - (double)dy * dy);
         int dx = (int)floor(dx_f + 0.5);
 
@@ -274,7 +266,6 @@ char *__sdl_surface_fill_circle(
         int x_end   = cx + dx;
 
         for (int xx = x_start; xx <= x_end; xx++) {
-            // Put pixel
             __sdl_surface_put_pixel(surface, xx, yy, red, green, blue, alpha);
         }
     }
@@ -282,6 +273,7 @@ char *__sdl_surface_fill_circle(
     if (SDL_MUSTLOCK(surface)) {
         SDL_UnlockSurface(surface);
     }
+
     return NULL;
 }
 
@@ -1440,6 +1432,77 @@ int l_sdl_get_pixel(
     lua_pushinteger(state, alpha);
     lua_setfield(state, -2, "alpha");
 
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_rectangle(
+    lua_State                   *state
+) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Rectangle(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Rectangle(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Rectangle(): Table expected for first parameter\n");
+    }
+
+    char *entity_id = (char *) __lua_table_get_string(state, "SDL_Rectangle()", 1, "id");
+    if (! entity_id) {
+        return 1;
+    }
+
+    SDL_FRect area;
+    char *result = __lua_table_get_area(state, "SDL_Rectabgle()", 1, &area);
+
+    if (! result) {
+        return 1;
+    }
+
+    SDL_Color rgba;
+
+    if ((result = __lua_table_get_rgba(state, "SDL_Rectangle()", 1, &rgba)) == NULL) {
+        return 1;
+    }
+
+    if (strcmp(entity_id, "") != 0) {
+        HASH_FIND_STR(app->hash, entity_id, entity);
+
+        if (! entity) {
+            snprintf(err_msg, SDL_ERR_LEN, "SDL_Rectangle(): Entity \"%s\" doesn\'t exist\n", entity_id);
+            lua_pushstring(state, err_msg);
+            return 1;
+        }
+
+        const SDL_PixelFormatDetails* formatDetails = SDL_GetPixelFormatDetails(entity->surface->format);
+        
+        SDL_Rect rect;
+        rect.x = (int) area.x;
+        rect.y = (int) area.y;
+        rect.w = (int) area.w;
+        rect.h = (int) area.h;
+
+        Uint32 pixel_color = SDL_MapRGBA(formatDetails, NULL, rgba.r, rgba.g, rgba.b, rgba.a);
+        SDL_FillSurfaceRect(entity->surface, &rect, pixel_color);
+    }
+    else {
+        SDL_SetRenderDrawColor(app->renderer, rgba.r, rgba.g, rgba.b, rgba.a);
+        SDL_RenderFillRect(app->renderer, &area);
+    }
+
+    lua_pushstring(state, "OK");
     return 1;
 }
 

@@ -62,6 +62,7 @@ the command if you want to just copy and paste to test it:
         demo/SDLua_loop.lua \
         demo/SDLua_quit.lua 
 
+**new stuff**
 
 Added a few new features. I've been building an image editor (**SDLua_draw**)
 which is basically a simply **MS Paint** clone. We can use it to create and edit
