@@ -1919,6 +1919,82 @@ int l_sdl_text(
 /**
  *
  */
+int l_sdl_textarea(
+    lua_State                   *state
+) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Textarea(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Textarea(): Exactly 1 parameter expected\n");
+    }
+    if (! lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_Textarea(): Table expected for first parameter\n");
+    }
+
+    const char *entity_path = __lua_table_get_string(state, "SDL_Textarea()", 1, "font");
+    if (! entity_path) {
+        return 1;
+    }
+    int entity_size;
+    const char *result = __lua_table_get_integer(state, "SDL_Textarea()", 1, "size", &entity_size);
+    if (! result) {
+        return 1;
+    }
+    const char *entity_text = __lua_table_get_string(state, "SDL_Textarea()", 1, "text");
+    if (! entity_text) {
+        return 1;
+    }
+
+    if (! (app->flags & APP_F_TTFINIT)) {
+        if (app->log) {
+            fprintf(app->log, ">>> Initialising TTF subsystem\n");
+        }
+        if (! TTF_Init()) {
+            return __lua_error_msg(state, "SDL_Textarea(): %s\n", SDL_GetError());
+        }
+        app->flags |= APP_F_TTFINIT;
+    }
+
+    TTF_Font *font = TTF_OpenFont(entity_path, entity_size);
+
+    if (! font) {
+        return __lua_error_msg(state, "SDL_Textarea(): %s", SDL_GetError());
+    }
+
+    int text_width, text_height;
+
+    if (! TTF_GetStringSize(font, entity_text, 0, &text_width, &text_height)) {
+        TTF_CloseFont(font);
+        return __lua_error_msg(state, "%s", SDL_GetError());
+    }
+
+    TTF_CloseFont(font);
+
+    lua_newtable(state);
+    lua_pushstring(state, "width");
+    lua_pushinteger(state, text_width);
+
+    lua_settable(state, -3);
+    lua_pushstring(state, "height");
+    lua_pushinteger(state, text_height);
+
+    lua_settable(state, -3);
+
+    return 1;
+}
+
+/**
+ *
+ */
 int l_sdl_surface_info(
     lua_State                   *state
 ) {
