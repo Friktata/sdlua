@@ -25,25 +25,49 @@ char *__sdl_error_msg(
 
 /**
  *
- */char *__sdl_entity(APP *app, const char *entity_id) {
+ */
+char *__sdl_entity(APP *app, const char *entity_id) {
     static int index = 0;
 
     SDL_Entity **entity = app->entity;
     int entities = app->entities;
 
-    if (!entity) {
-        entity = malloc(sizeof(SDL_Entity *));
-        if (!entity) {
-            return __sdl_error_msg("malloc() error in __sdl_entity(): %s", strerror(errno));
+    int entity_index = -1;
+
+    for (int i = 0; i < app->entities; i++) {
+        if (app->entity[i]->type == SDL_ENTITY_EMPTY) {
+            if (app->entity[i]->surface == NULL && app->entity[i]->texture == NULL) {
+                entity_index = i;
+                break;
+            }
         }
-        entities = 0;
+    }
+
+    if (entity_index == -1) {
+        if (!entity) {
+            entity = malloc(sizeof(SDL_Entity *));
+            if (!entity) {
+                return __sdl_error_msg("malloc() error in __sdl_entity(): %s", strerror(errno));
+            }
+            entities = 0;
+        }
+        else {
+            SDL_Entity **new_entities = realloc(entity, sizeof(SDL_Entity *) * (entities + 1));
+            if (!new_entities) {
+                return __sdl_error_msg("realloc() error in __sdl_entity(): %s", strerror(errno));
+            }
+            entity = new_entities;
+        }
+        if (app->log) {
+            fprintf(app->log, "Creating new entity %d (%s)\n", entities, entity_id);
+        }
     }
     else {
-        SDL_Entity **new_entities = realloc(entity, sizeof(SDL_Entity *) * (entities + 1));
-        if (!new_entities) {
-            return __sdl_error_msg("realloc() error in __sdl_entity(): %s", strerror(errno));
+        if (app->log) {
+            fprintf(app->log, "Re-using defunct entity %d (%s)\n", entity_index, entity_id);
         }
-        entity = new_entities;
+
+        entities = entity_index;
     }
 
     SDL_Entity *e = malloc(sizeof(SDL_Entity));
@@ -779,20 +803,6 @@ SDL_Cursor *__sdl_get_cursor(
         "hand"
     };
 
-    const char *sdl_custom_cursors[SDL_CUSTOM_CURSORS] = {
-        "pencil_tool",
-        "eraser_tool",
-        "bucket_tool",
-        "picker_tool"
-    };
-
-    const char *sdl_cursor_paths[SDL_CUSTOM_CURSORS] = {
-        "./images/icons/pencil.png",
-        "./images/icons/eraser.png",
-        "./images/icons/bucket.png",
-        "./images/icons/picker.png"
-    };
-
     static SDL_Cursor *sdl_cursors[SDL_CURSORS_MAX] = { NULL };
     static SDL_Cursor *sdl_custom[SDL_CUSTOM_CURSORS] = { NULL };
 
@@ -802,51 +812,10 @@ SDL_Cursor *__sdl_get_cursor(
             if (app->log) {
                 fprintf(app->log, ">>> Created system cursor %s\n", sdl_cursor_names[cursor]);
             }
-            continue;
         }
 
         if (cursor_name && (strcmp(cursor_name, sdl_cursor_names[cursor]) == 0)) {
             return sdl_cursors[cursor];
-        }
-    }
-
-    for (int cursor = 0; cursor < SDL_CUSTOM_CURSORS; cursor++) {
-        if (! sdl_custom[cursor]) {
-            SDL_Surface *surface = IMG_Load(sdl_cursor_paths[cursor]);
-            if (! surface) {
-                fprintf(stderr, "Error loading icons: %s\n", SDL_GetError());
-                return NULL;
-            }
-
-            SDL_Surface *resized = SDL_CreateSurface(24, 24, SDL_PIXELFORMAT_RGBA32);
-            if (!resized) {
-                fprintf(stderr, "Failed to create surface: %s", SDL_GetError());
-                SDL_DestroySurface(surface);
-                return false;
-            }
-
-            if (!SDL_BlitSurfaceScaled(surface, NULL, resized, NULL, SDL_SCALEMODE_LINEAR)) {
-                fprintf(stderr, "Scaling failed: %s", SDL_GetError());
-                SDL_DestroySurface(surface);
-                SDL_DestroySurface(resized);
-                return false;
-            }
-
-            SDL_DestroySurface(surface);
-            sdl_custom[cursor] = SDL_CreateColorCursor(resized, 0, 23);
-            
-            if (! sdl_custom[cursor]) {
-                fprintf(stderr, "Error loading icons: %s\n", SDL_GetError());
-                return NULL;
-            }
-            
-            if (app->log) {
-                fprintf(app->log, ">>> Loaded custom cursor %s\n", sdl_cursor_paths[cursor]);
-            }
-        }
-
-        if (strcmp(cursor_name, sdl_custom_cursors[cursor]) == 0) {
-            return sdl_custom[cursor];
         }
     }
 
@@ -953,6 +922,55 @@ int l_sdl_surface(
             entity_height
         );
     }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_destroy_surface(
+    lua_State                   *state
+) {
+    char err_msg[LUA_ERR_LEN];
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    SDL_Entity *entity = NULL;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Destroy(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_Destroy(): Exactly 1 parameter expected\n");
+    }
+    if (lua_type(state, 1) != LUA_TSTRING) {
+        return __lua_error_msg(state, "SDL_Destroy(): String expected for first parameter\n");
+    }
+
+    const char *entity_id = lua_tostring(state, 1);
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+
+    if (! entity) {
+        return __lua_error_msg(state, "SDL_Destroy(): Entity \"%s\" not found\n", entity_id);
+    }
+
+    if (app->log) {
+        fprintf(app->log, ">>> Destroyed entity %s\n", entity_id);
+    }
+
+    if (entity->texture) {
+        SDL_DestroyTexture(entity->texture);
+        entity->texture = NULL;
+    }
+    if (entity->surface) {
+        SDL_DestroySurface(entity->surface);
+        entity->surface = NULL;
+    }
+
+    entity_free(entity);
 
     lua_pushstring(state, "OK");
     return 1;

@@ -36,6 +36,7 @@ int     l_sdl_fullscreen        (lua_State *);
 int     l_sdl_drawcolor         (lua_State *);
 int     l_sdl_set_cursor        (lua_State *);
 int     l_sdl_surface           (lua_State *);
+int     l_sdl_destroy_surface   (lua_State *);
 int     l_sdl_put_pixel         (lua_State *);
 int     l_sdl_get_pixel         (lua_State *);
 int     l_sdl_rectangle         (lua_State *);
@@ -70,6 +71,7 @@ static const struct luaL_Reg sdl_lib[] = {
     { "SDL_Drawcolor",          l_sdl_drawcolor },
     { "SDL_Setcursor",          l_sdl_set_cursor },
     { "SDL_Surface",            l_sdl_surface },
+    { "SDL_Destroy",            l_sdl_destroy_surface },
     { "SDL_Putpixel",           l_sdl_put_pixel },
     { "SDL_Getpixel",           l_sdl_get_pixel },
     { "SDL_Rectangle",          l_sdl_rectangle },
