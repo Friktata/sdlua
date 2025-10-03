@@ -49,6 +49,7 @@ int     l_sdl_flushsurfaces     (lua_State *);
 int     l_sdl_texture           (lua_State *);
 int     l_sdl_image             (lua_State *);
 int     l_sdl_text              (lua_State *);
+int     l_sdl_cliprect          (lua_State *);
 int     l_sdl_textarea          (lua_State *);
 int     l_sdl_surface_info      (lua_State *);
 int     l_sdl_update            (lua_State *);
@@ -85,6 +86,7 @@ static const struct luaL_Reg sdl_lib[] = {
     { "SDL_Texture",            l_sdl_texture },
     { "SDL_Image",              l_sdl_image },
     { "SDL_Text",               l_sdl_text },
+    { "SDL_Cliprect",           l_sdl_cliprect },
     { "SDL_Textarea",           l_sdl_textarea },
     { "SDL_Surfaceinfo",        l_sdl_surface_info },
     { "SDL_Update",             l_sdl_update },

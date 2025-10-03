@@ -1819,6 +1819,13 @@ int l_sdl_text(
         return 1;
     }
 
+    // bool clip_rect;
+    
+    // result = __lua_table_get_boolean(state, "SDL_Text()", 1, "clip_rect", &clip_rect);
+    // if (! result) {
+    //     clip_rect = false;
+    // }
+
     SDL_FRect area;
     if ((result = __lua_table_get_area(state, "SDL_Text()", 1, &area)) == NULL) {
         return 1;
@@ -1870,6 +1877,17 @@ int l_sdl_text(
         return __lua_error_msg(state, "%s", SDL_GetError());
     }
 
+    // SDL_Rect rect;
+
+    // rect.x = area.x;
+    // rect.y = area.y;
+    // rect.w = area.w;
+    // rect.h = area.h;
+
+    // if (clip_rect) {
+    //     SDL_SetRenderClipRect(app->renderer, &rect);
+    // }
+
     entity->surface = TTF_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
     // entity->surface = SDL_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
 
@@ -1893,6 +1911,10 @@ int l_sdl_text(
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
     memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
 
+    // if (clip_rect) {
+    //     SDL_SetRenderClipRect(app->renderer, NULL);
+    // }
+
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL text %s @ %dx%d (%dx%d), font=\"%s\", size=%d, text=\"%s\"\n",
             entity_id,
@@ -1911,6 +1933,65 @@ int l_sdl_text(
     }
 
     TTF_CloseFont(font);
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
+int l_sdl_cliprect(
+    lua_State                   *state
+) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    SDL_Rect rect;
+    SDL_Rect *clip_rect = &rect;
+
+    if (! (app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_Textarea(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) == 0) {
+        clip_rect = NULL;
+        // return __lua_error_msg(state, "SDL_Textarea(): Exactly 1 parameter expected\n");
+    }
+    else {
+        if (! lua_istable(state, 1)) {
+            return __lua_error_msg(state, "SDL_Textarea(): Table expected for first parameter\n");
+        }
+    }
+
+    SDL_FRect area;
+    char *result;
+
+    if (clip_rect) {
+        if ((result = __lua_table_get_area(state, "SDL_Text()", 1, &area)) == NULL) {
+            return 1;
+        }
+
+        clip_rect->x = (int) area.x;
+        clip_rect->y = (int) area.y;
+        clip_rect->w = (int) area.w;
+        clip_rect->h = (int) area.h;
+    }
+
+    if (app->log) {
+        if (clip_rect) {
+            fprintf(app->log, ">>> Enabling clipping area @ x=%d, y=%d (width=%d, height=%d)\n", rect.x, rect.y, rect.w, rect.h);
+        }
+        else {
+            fprintf(app->log, ">>> Dsabling clipping area\n");
+        }
+    }
+
+    SDL_SetRenderClipRect(app->renderer, clip_rect);
 
     lua_pushstring(state, "OK");
     return 1;
