@@ -39,9 +39,12 @@ int     l_sdl_surface           (lua_State *);
 int     l_sdl_destroy_surface   (lua_State *);
 int     l_sdl_put_pixel         (lua_State *);
 int     l_sdl_get_pixel         (lua_State *);
+int     l_sdl_drawline          (lua_State *);
 int     l_sdl_rectangle         (lua_State *);
 int     l_sdl_circle            (lua_State *);
 int     l_sdl_fill_surface      (lua_State *);
+int     l_sdl_draw_gradient     (lua_State *);
+int     l_sdl_quad_gradient     (lua_State *);
 int     l_sdl_pushsurface       (lua_State *);
 int     l_sdl_prevsurface       (lua_State *);
 int     l_sdl_nextsurface       (lua_State *);
@@ -76,9 +79,12 @@ static const struct luaL_Reg sdl_lib[] = {
     { "SDL_Destroy",            l_sdl_destroy_surface },
     { "SDL_Putpixel",           l_sdl_put_pixel },
     { "SDL_Getpixel",           l_sdl_get_pixel },
+    { "SDL_Drawline",           l_sdl_drawline },
     { "SDL_Rectangle",          l_sdl_rectangle },
     { "SDL_Circle",             l_sdl_circle },
     { "SDL_Fill",               l_sdl_fill_surface },
+    { "SDL_Drawgradient",       l_sdl_draw_gradient },
+    { "SDL_Quadgradient",       l_sdl_quad_gradient },
     { "SDL_Pushsurface",        l_sdl_pushsurface },
     { "SDL_Prevsurface",        l_sdl_prevsurface },
     { "SDL_Nextsurface",        l_sdl_nextsurface },

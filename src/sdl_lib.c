@@ -1025,6 +1025,278 @@ int l_sdl_fill_surface(
 /**
  *
  */
+int l_sdl_draw_gradient(lua_State *state) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (!(app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_DrawGradientRect(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_DrawGradientRect(): Exactly 1 parameter expected");
+    }
+
+    if (!lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_DrawGradientRect(): Table expected for first parameter");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_DrawGradientRect()", 1, "id");
+    if (!entity_id) {
+        return 1;
+    }
+
+    SDL_FRect area;
+    if (!__lua_table_get_area(state, "SDL_DrawGradientRect()", 1, &area)) {
+        return 1;
+    }
+
+    SDL_Color color_start;
+    lua_getfield(state, 1, "color_start");
+    if (!lua_istable(state, -1)) {
+        return __lua_error_msg(state, "SDL_DrawGradientRect(): color_start must be a table");
+    }
+    if (!__lua_table_get_rgba(state, "SDL_DrawGradientRect()", -1, &color_start)) {
+        return 1;
+    }
+    lua_pop(state, 1);
+
+    SDL_Color color_end;
+    lua_getfield(state, 1, "color_end");
+    if (!lua_istable(state, -1)) {
+        return __lua_error_msg(state, "SDL_DrawGradientRect(): color_end must be a table");
+    }
+    if (!__lua_table_get_rgba(state, "SDL_DrawGradientRect()", -1, &color_end)) {
+        return 1;
+    }
+    lua_pop(state, 1);
+
+    const char *direction = __lua_table_get_string(state, "SDL_DrawGradientRect()", 1, "direction");
+    if (!direction) {
+        direction = "horizontal";
+    }
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+    if (!entity) {
+        if ((err = __sdl_entity(app, entity_id)) != NULL) {
+            return __lua_error_msg(state, err);
+        }
+        HASH_FIND_STR(app->hash, entity_id, entity);
+        if (!entity) {
+            return __lua_error_msg(state, "SDL_DrawGradientRect(): Entity \"%s\" not found", entity_id);
+        }
+    }
+
+    if (!entity->surface) {
+        return __lua_error_msg(state, "SDL_DrawGradientRect(): Entity surface not found");
+    }
+
+    if (entity->texture) {
+        SDL_DestroyTexture(entity->texture);
+        entity->texture = NULL;
+    }
+
+    if (SDL_MUSTLOCK(entity->surface)) {
+        if (SDL_LockSurface(entity->surface) != 0) {
+            return __lua_error_msg(state, "SDL_DrawGradientRect(): %s", SDL_GetError());
+        }
+    }
+
+    Uint32 *pixels = (Uint32 *) entity->surface->pixels;
+    int pitch = entity->surface->pitch / sizeof(Uint32);
+    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(entity->surface->format);
+
+    for (int row = 0; row < (int) area.h; row++) {
+        for (int col = 0; col < (int) area.w; col++) {
+            float t = 0.0f;
+            if (strcmp(direction, "vertical") == 0) {
+                t = (float) row / ((float) area.h - 1.0f);
+            } else {
+                t = (float) col / ((float) area.w - 1.0f);
+            }
+
+            Uint8 r = (Uint8) ((1.0f - t) * color_start.r + t * color_end.r);
+            Uint8 g = (Uint8) ((1.0f - t) * color_start.g + t * color_end.g);
+            Uint8 b = (Uint8) ((1.0f - t) * color_start.b + t * color_end.b);
+            Uint8 a = (Uint8) ((1.0f - t) * color_start.a + t * color_end.a);
+
+            Uint32 pixel_color = SDL_MapRGBA(fmt, NULL, r, g, b, a);
+
+            int px = col;
+            int py = row;
+            if ((px >= 0) && (px < entity->surface->w) && (py >= 0) && (py < entity->surface->h)) {
+                pixels[py * pitch + px] = pixel_color;
+            }
+        }
+    }
+
+    if (SDL_MUSTLOCK(entity->surface)) {
+        SDL_UnlockSurface(entity->surface);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+/**
+ *
+ */
+int l_sdl_quad_gradient(lua_State *state) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (!(app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): Exactly 1 parameter expected");
+    }
+
+    if (!lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): Table expected for first parameter");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_QuadGradient()", 1, "id");
+    if (!entity_id) {
+        return 1;
+    }
+
+    SDL_FRect area;
+    if (!__lua_table_get_area(state, "SDL_QuadGradient()", 1, &area)) {
+        return 1;
+    }
+
+    SDL_Color top_left;
+    lua_getfield(state, 1, "top_left");
+    if (!lua_istable(state, -1)) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): top_left must be a table");
+    }
+    if (!__lua_table_get_rgba(state, "SDL_QuadGradient()", -1, &top_left)) {
+        return 1;
+    }
+    lua_pop(state, 1);
+
+    SDL_Color top_right;
+    lua_getfield(state, 1, "top_right");
+    if (!lua_istable(state, -1)) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): top_right must be a table");
+    }
+    if (!__lua_table_get_rgba(state, "SDL_QuadGradient()", -1, &top_right)) {
+        return 1;
+    }
+    lua_pop(state, 1);
+
+    SDL_Color bottom_left;
+    lua_getfield(state, 1, "bottom_left");
+    if (!lua_istable(state, -1)) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): bottom_left must be a table");
+    }
+    if (!__lua_table_get_rgba(state, "SDL_QuadGradient()", -1, &bottom_left)) {
+        return 1;
+    }
+    lua_pop(state, 1);
+
+    SDL_Color bottom_right;
+    lua_getfield(state, 1, "bottom_right");
+    if (!lua_istable(state, -1)) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): bottom_right must be a table");
+    }
+    if (!__lua_table_get_rgba(state, "SDL_QuadGradient()", -1, &bottom_right)) {
+        return 1;
+    }
+    lua_pop(state, 1);
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+    if (!entity) {
+        if ((err = __sdl_entity(app, entity_id)) != NULL) {
+            return __lua_error_msg(state, err);
+        }
+        HASH_FIND_STR(app->hash, entity_id, entity);
+        if (!entity) {
+            return __lua_error_msg(state, "SDL_QuadGradient(): Entity \"%s\" not found", entity_id);
+        }
+    }
+
+    if (!entity->surface) {
+        return __lua_error_msg(state, "SDL_QuadGradient(): Entity surface not found");
+    }
+
+    if (entity->texture) {
+        SDL_DestroyTexture(entity->texture);
+        entity->texture = NULL;
+    }
+
+    if (SDL_MUSTLOCK(entity->surface)) {
+        if (SDL_LockSurface(entity->surface) != 0) {
+            return __lua_error_msg(state, "SDL_QuadGradient(): %s", SDL_GetError());
+        }
+    }
+
+    Uint32 *pixels = (Uint32 *) entity->surface->pixels;
+    int pitch = entity->surface->pitch / sizeof(Uint32);
+    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(entity->surface->format);
+
+    for (int row = 0; row < (int) area.h; row++) {
+        float v = (float) row / ((float) area.h - 1.0f);
+
+        for (int col = 0; col < (int) area.w; col++) {
+            float u = (float) col / ((float) area.w - 1.0f);
+
+            Uint8 r = (Uint8)(
+                top_left.r * (1 - u) * (1 - v) +
+                top_right.r * u * (1 - v) +
+                bottom_left.r * (1 - u) * v +
+                bottom_right.r * u * v
+            );
+
+            Uint8 g = (Uint8)(
+                top_left.g * (1 - u) * (1 - v) +
+                top_right.g * u * (1 - v) +
+                bottom_left.g * (1 - u) * v +
+                bottom_right.g * u * v
+            );
+
+            Uint8 b = (Uint8)(
+                top_left.b * (1 - u) * (1 - v) +
+                top_right.b * u * (1 - v) +
+                bottom_left.b * (1 - u) * v +
+                bottom_right.b * u * v
+            );
+
+            Uint8 a = (Uint8)(
+                top_left.a * (1 - u) * (1 - v) +
+                top_right.a * u * (1 - v) +
+                bottom_left.a * (1 - u) * v +
+                bottom_right.a * u * v
+            );
+
+            Uint32 pixel_color = SDL_MapRGBA(fmt, NULL, r, g, b, a);
+
+            int px = col;
+            int py = row;
+            if ((px >= 0) && (px < entity->surface->w) && (py >= 0) && (py < entity->surface->h)) {
+                pixels[py * pitch + px] = pixel_color;
+            }
+        }
+    }
+
+    if (SDL_MUSTLOCK(entity->surface)) {
+        SDL_UnlockSurface(entity->surface);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
 int l_sdl_pushsurface(
     lua_State                   *state
 ) {
@@ -1456,6 +1728,131 @@ int l_sdl_get_pixel(
 /**
  *
  */
+int l_sdl_drawline(lua_State *state) {
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+    char *err;
+    char err_msg[LUA_ERR_LEN];
+
+    SDL_Entity *entity;
+
+    if (!(app->flags & APP_F_SDLINIT)) {
+        return __lua_error_msg(state, "SDL_DrawLine(): SDL not initialised");
+    }
+
+    if (lua_gettop(state) != 1) {
+        return __lua_error_msg(state, "SDL_DrawLine(): Exactly 1 parameter expected");
+    }
+
+    if (!lua_istable(state, 1)) {
+        return __lua_error_msg(state, "SDL_DrawLine(): Table expected for first parameter");
+    }
+
+    const char *entity_id = __lua_table_get_string(state, "SDL_DrawLine()", 1, "id");
+    if (!entity_id) {
+        return 1;
+    }
+
+    int start_x, start_y, end_x, end_y, weight = 1;
+    const char *result;
+
+    result = __lua_table_get_integer(state, "SDL_DrawLine()", 1, "start_x", &start_x);
+    if (!result) {
+        return 1;
+    }
+    result = __lua_table_get_integer(state, "SDL_DrawLine()", 1, "start_y", &start_y);
+    if (!result) {
+        return 1;
+    }
+    result = __lua_table_get_integer(state, "SDL_DrawLine()", 1, "end_x", &end_x);
+    if (!result) {
+        return 1;
+    }
+    result = __lua_table_get_integer(state, "SDL_DrawLine()", 1, "end_y", &end_y);
+    if (!result) {
+        return 1;
+    }
+
+    result = __lua_table_get_integer(state, "SDL_DrawLine()", 1, "weight", &weight);
+    if (!result) {
+        weight = 1;
+    }
+
+    SDL_Color rgba;
+    if (!__lua_table_get_rgba(state, "SDL_DrawLine()", 1, &rgba)) {
+        return 1;
+    }
+
+    HASH_FIND_STR(app->hash, entity_id, entity);
+    if (!entity) {
+        if ((err = __sdl_entity(app, entity_id)) != NULL) {
+            return __lua_error_msg(state, err);
+        }
+        HASH_FIND_STR(app->hash, entity_id, entity);
+        if (!entity) {
+            return __lua_error_msg(state, "SDL_DrawLine(): Entity \"%s\" not found", entity_id);
+        }
+    }
+
+    if (!entity->surface) {
+        return __lua_error_msg(state, "SDL_DrawLine(): Entity surface not found");
+    }
+
+    if (entity->texture) {
+        SDL_DestroyTexture(entity->texture);
+        entity->texture = NULL;
+    }
+
+    if (SDL_MUSTLOCK(entity->surface)) {
+        if (SDL_LockSurface(entity->surface) != 0) {
+            return __lua_error_msg(state, "SDL_DrawLine(): %s", SDL_GetError());
+        }
+    }
+
+    Uint32 *pixels = (Uint32 *) entity->surface->pixels;
+    int pitch = entity->surface->pitch / sizeof(Uint32);
+    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(entity->surface->format);
+    Uint32 pixel_color = SDL_MapRGBA(fmt, NULL, rgba.r, rgba.g, rgba.b, rgba.a);
+
+    int dx = abs(end_x - start_x);
+    int sx = start_x < end_x ? 1 : -1;
+    int dy = -abs(end_y - start_y);
+    int sy = start_y < end_y ? 1 : -1;
+    int line_err = dx + dy;
+
+    while (1) {
+        for (int wx = -weight/2; wx <= weight/2; wx++) {
+            for (int wy = -weight/2; wy <= weight/2; wy++) {
+                int px = start_x + wx;
+                int py = start_y + wy;
+                if ((px >= 0) && (px < entity->surface->w) && (py >= 0) && (py < entity->surface->h)) {
+                    pixels[py * pitch + px] = pixel_color;
+                }
+            }
+        }
+
+        if (start_x == end_x && start_y == end_y) break;
+        int e2 = 2 * line_err;
+        if (e2 >= dy) {
+            line_err += dy;
+            start_x += sx;
+        }
+        if (e2 <= dx) {
+            line_err += dx;
+            start_y += sy;
+        }
+    }
+
+    if (SDL_MUSTLOCK(entity->surface)) {
+        SDL_UnlockSurface(entity->surface);
+    }
+
+    lua_pushstring(state, "OK");
+    return 1;
+}
+
+/**
+ *
+ */
 int l_sdl_rectangle(
     lua_State                   *state
 ) {
@@ -1818,13 +2215,11 @@ int l_sdl_text(
     if (! entity_text) {
         return 1;
     }
-
-    // bool clip_rect;
-    
-    // result = __lua_table_get_boolean(state, "SDL_Text()", 1, "clip_rect", &clip_rect);
-    // if (! result) {
-    //     clip_rect = false;
-    // }
+    int wrap;
+    result = __lua_table_get_integer(state, "SDL_Text()", 1, "wrap", &wrap);
+    if (! result) {
+        wrap = 0;
+    }
 
     SDL_FRect area;
     if ((result = __lua_table_get_area(state, "SDL_Text()", 1, &area)) == NULL) {
@@ -1877,19 +2272,12 @@ int l_sdl_text(
         return __lua_error_msg(state, "%s", SDL_GetError());
     }
 
-    // SDL_Rect rect;
-
-    // rect.x = area.x;
-    // rect.y = area.y;
-    // rect.w = area.w;
-    // rect.h = area.h;
-
-    // if (clip_rect) {
-    //     SDL_SetRenderClipRect(app->renderer, &rect);
-    // }
-
-    entity->surface = TTF_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
-    // entity->surface = SDL_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
+    if (wrap > 0) {
+        entity->surface = TTF_RenderText_Blended_Wrapped(font, entity_text, strlen(entity_text), rgba, wrap);
+    }
+    else {
+        entity->surface = TTF_RenderText_Blended(font, entity_text, strlen(entity_text), rgba);
+    }
 
     if (! entity->surface) {
         return __lua_error_msg(state, "%s", SDL_GetError());
@@ -1908,12 +2296,16 @@ int l_sdl_text(
         area.h = (float) entity->texture->h;
     }
 
-    SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
-    memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
+    SDL_Rect rect;
 
-    // if (clip_rect) {
-    //     SDL_SetRenderClipRect(app->renderer, NULL);
-    // }
+    rect.x = (int) area.x;
+    rect.y = (int) area.y;
+    rect.w = (int) area.w;
+    rect.h = (int) area.h;
+
+    SDL_RenderTexture(app->renderer, entity->texture, NULL, &area);
+
+    memcpy(&entity->area, &area, (sizeof(SDL_FRect)));
 
     if (app->log) {
         fprintf(app->log, ">>> Created new SDL text %s @ %dx%d (%dx%d), font=\"%s\", size=%d, text=\"%s\"\n",
@@ -1946,25 +2338,19 @@ int l_sdl_cliprect(
 ) {
     APP *app = (APP *) (*(void **) lua_getextraspace(state));
 
-    char *err;
-    char err_msg[LUA_ERR_LEN];
-
-    SDL_Entity *entity;
-
     SDL_Rect rect;
     SDL_Rect *clip_rect = &rect;
 
     if (! (app->flags & APP_F_SDLINIT)) {
-        return __lua_error_msg(state, "SDL_Textarea(): SDL not initialised");
+        return __lua_error_msg(state, "SDL_Cliprect(): SDL not initialised");
     }
 
-    if (lua_gettop(state) == 0) {
+    if (lua_gettop(state) < 1) {
         clip_rect = NULL;
-        // return __lua_error_msg(state, "SDL_Textarea(): Exactly 1 parameter expected\n");
     }
     else {
         if (! lua_istable(state, 1)) {
-            return __lua_error_msg(state, "SDL_Textarea(): Table expected for first parameter\n");
+            return __lua_error_msg(state, "SDL_Cliprect(): Table expected for first parameter\n");
         }
     }
 
@@ -1972,7 +2358,7 @@ int l_sdl_cliprect(
     char *result;
 
     if (clip_rect) {
-        if ((result = __lua_table_get_area(state, "SDL_Text()", 1, &area)) == NULL) {
+        if ((result = __lua_table_get_area(state, "SDL_Cliprect()", 1, &area)) == NULL) {
             return 1;
         }
 
@@ -1984,10 +2370,10 @@ int l_sdl_cliprect(
 
     if (app->log) {
         if (clip_rect) {
-            fprintf(app->log, ">>> Enabling clipping area @ x=%d, y=%d (width=%d, height=%d)\n", rect.x, rect.y, rect.w, rect.h);
+            fprintf(stdout, ">>> Enabling clipping area @ x=%d, y=%d (width=%d, height=%d)\n", rect.x, rect.y, rect.w, rect.h);
         }
         else {
-            fprintf(app->log, ">>> Dsabling clipping area\n");
+            fprintf(stdout, ">>> Dsabling clipping area\n");
         }
     }
 
@@ -2532,6 +2918,7 @@ int l_sdl_render(
     }
 
     SDL_RenderTexture(app->renderer, entity->texture, NULL, &entity->area);
+    SDL_FlushRenderer(app->renderer);
 
     lua_pushstring(state, "OK");
     return 1;

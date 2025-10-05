@@ -1,5 +1,143 @@
 ### Updates
 
+**update** 05/10/2025
+
+More functions have been added!
+
+```
+    SDL_Gradient()
+    SDL_Quadgradient()
+    SDL_Drawline()
+```
+
+Fairly self explanitory, here's an example of drawing a two-color gradient:
+
+```
+    -- Define a gradient...
+    gs = {
+        id = "gs",
+        x = 0,
+        y = 0,
+        width = 100,
+        height = 100,
+        color_start = { red = 255, green = 0, blue = 255, alpha = 255 },
+        color_end = { red = 0, green = 255, blue = 0, alpha = 255 },
+        direction = "vertical"
+    }
+    
+    -- Create a surface...
+    SDL_Error = SDL_Surface(gs)
+    if (SDL_Error ~= "OK") then
+        SDLui:err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    -- Draw the gradient onto the surface...
+    SDL_Error = SDL_Gradient(gs)
+    if (SDL_Error ~= "OK") then
+        SDLui:err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    -- Create a texture from the surface and render.
+    SDL_Error = SDL_Texture(gs)
+    if (SDL_Error ~= "OK") then
+        SDLui:err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    SDL_Render(gs.id)
+```
+
+To draw a 4-color gradient:
+
+```
+    -- Define a gradient...
+    gs = {
+        id = "gs",
+        x = 0,
+        y = 0,
+        width = 100,
+        height = 100,
+        top_left = { red = 255, green = 0, blue = 255, alpha = 255 },
+        top_right = { red = 0, green = 255, blue = 0, alpha = 255 },
+        bottom_left = { red = 0, green = 0, blue = 0, alpha = 255 },
+        bottom_right = { red = 255, green = 255, blue = 255, alpha = 255 },
+        direction = "horizontal"
+    }
+    
+    -- Create a surface...
+    SDL_Error = SDL_Surface(gs)
+    if (SDL_Error ~= "OK") then
+        SDLui:err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    -- Draw the gradient onto the surface...
+    SDL_Error = SDL_Quadgradient(gs)
+    if (SDL_Error ~= "OK") then
+        SDLui:err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    -- Create a texture from the surface and render.
+    SDL_Error = SDL_Texture(gs)
+    if (SDL_Error ~= "OK") then
+        SDLui:err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    SDL_Render(gs.id)
+```
+
+And ```SDL_Drawline``` will draw a line to a surface using **Bresenham's** 
+line drawing algorithm:
+
+```
+    -- Create the surface...
+    SDL_Error = SDL_Surface({
+        id = "line_surface",
+        x = 0,
+        y = 0,
+        width = 100,
+        height = 100
+    })
+
+    -- Draw the line...
+    SDL_Error = SDL_Drawline({
+        id = "line_surface",
+        start_x = 0,
+        start_y = 0,
+        end_x = 99,
+        end_y = 99,
+        red = 200,
+        green = 32,
+        blue = 240,
+        alpha = 255,
+        weight = 5
+    })
+
+    if (SDL_Error ~= "OK") then
+        SDLui.err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    -- Create the texture and render.
+    SDL_Error = SDL_Texture("line_surface")
+
+    if (SDL_Error ~= "OK") then
+        SDLui.err_msg = SDL_Error
+        SDLui.initialised = false
+    end
+
+    SDL_Render("line_surface")
+```
+
+I'm busy working on the **UI** library, see [SDLui](https://github.com/Friktata/sdlui)
+for more info.
+
+---
+
 **update** 28/09/2025
 
 **SDLK_**
