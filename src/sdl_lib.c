@@ -3305,4 +3305,39 @@ void reg_sdl_keycodes(
     lua_pushinteger(state, SDLK_9);
     lua_setglobal(state, "SDLK_9");
 
+    lua_pushinteger(state, SDLK_SPACE);
+    lua_setglobal(state, "SDLK_SPACE");
+
+    lua_pushinteger(state, SDLK_COMMA);
+    lua_setglobal(state, "SDLK_COMMA");
+
+    lua_pushinteger(state, SDLK_PERIOD);
+    lua_setglobal(state, "SDLK_PERIOD");
+
+    lua_pushinteger(state, SDLK_MINUS);
+    lua_setglobal(state, "SDLK_MINUS");
+
+    lua_pushinteger(state, SDLK_EQUALS);
+    lua_setglobal(state, "SDLK_EQUALS");
+
+    lua_pushinteger(state, SDLK_SEMICOLON);
+    lua_setglobal(state, "SDLK_SEMICOLON");
+
+    lua_pushinteger(state, SDLK_APOSTROPHE);
+    lua_setglobal(state, "SDLK_APOSTROPHE");
+
+    lua_pushinteger(state, SDLK_SLASH);
+    lua_setglobal(state, "SDLK_SLASH");
+
+    lua_pushinteger(state, SDLK_BACKSLASH);
+    lua_setglobal(state, "SDLK_BACKSLASH");
+
+    lua_pushinteger(state, SDLK_LEFTBRACKET);
+    lua_setglobal(state, "SDLK_LEFTBRACKET");
+
+    lua_pushinteger(state, SDLK_RIGHTBRACKET);
+    lua_setglobal(state, "SDLK_RIGHTBRACKET");
+
+    lua_pushinteger(state, SDLK_GRAVE);
+    lua_setglobal(state, "SDLK_GRAVE");
 }
