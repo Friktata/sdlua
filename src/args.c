@@ -186,7 +186,13 @@ char *sort_args(
             continue;
         }
 
-        if (strcmp(argv[arg], "-run") == 0) {
+        if ((strcmp(argv[arg], "-run") == 0) || (strcmp(argv[arg], "-runclear") == 0)) {
+            unsigned char __run_flags = 0;
+
+            if (strcmp(argv[arg], "-runclear") == 0) {
+                __run_flags |= SCRIPTS_F_NOEXEC;
+            }
+
             if (! app->scripts.scripts) {
                 return "Error in sort_args(): Nothing to run\n";
             }
@@ -195,7 +201,7 @@ char *sort_args(
                 state = NULL;
             }
 
-            if ((err = exec_all(app->log, &app->scripts, &state, SCRIPTS_F_NOEXEC, &shared_status)) != NULL) {
+            if ((err = exec_all(app->log, &app->scripts, &state, __run_flags, &shared_status)) != NULL) {
                 return err;
             }
 
