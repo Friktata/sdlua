@@ -44,8 +44,6 @@ void l_store_update(
             break;
         case LUA_T_STRING:
             lua_pushstring(state, store->data.string);
-            free(store->data.string);
-            store->data.string = NULL;
             break;
         case LUA_T_BOOLEAN:
             lua_pushboolean(state, store->data.boolean);
@@ -55,13 +53,15 @@ void l_store_update(
             break;
     }
 
-    lua_setglobal(state, "return_status");
+    lua_setglobal(state, "__return_status");
 }
 
 /**
  *
  */
-void l_store_free(LuaStore *store) {
+void l_store_free(
+    LuaStore                *store
+) {
     if (store->type == LUA_T_STRING && store->data.string) {
         free(store->data.string);
         store->data.string = NULL;

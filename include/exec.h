@@ -32,6 +32,6 @@
 
 char        *exec_concurrent    (FILE *, const char *, lua_State *, unsigned char, const char *);
 char        *exec_scripts       (FILE *, const char **, const int, lua_State *, unsigned char, LuaStore *, const char *);
-char        *exec_all           (FILE *, SCRIPTS *, lua_State **);
+char        *exec_all           (FILE *, SCRIPTS *, lua_State **, unsigned char, LuaStore *);
 
 #endif

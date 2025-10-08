@@ -141,11 +141,11 @@ char *exec_scripts(
         return &err_msg[0];
     }
 
-    for (int index = 0; index < scripts; index++) {
-        lua_pushstring(state, "__return_status");
-        lua_pushnil(state);
-        lua_settable(state, LUA_REGISTRYINDEX);
+    lua_pushstring(state, "__return_status");
+    lua_pushnil(state);
+    lua_settable(state, LUA_REGISTRYINDEX);
 
+    for (int index = 0; index < scripts; index++) {
         err = exec_concurrent(log, script[index], state, flags, cwd);
 
         if (err) {
@@ -177,12 +177,12 @@ char *exec_scripts(
 char *exec_all(
     FILE                    *log,
     SCRIPTS                 *scripts,
-    lua_State               **l_state
+    lua_State               **l_state,
+    unsigned char           flags,
+    LuaStore                *shared_status
 ) {
     static char err_msg[EXEC_ERR_LEN];
     char *err = NULL;
-
-    LuaStore return_status = { LUA_T_EMPTY };
 
     char current_path[FILENAME_MAX] = {0};
     char *cwd = getcwd(&current_path[0], FILENAME_MAX);
@@ -206,11 +206,27 @@ char *exec_all(
     }
 
     for (int scriptenv = 0; scriptenv < scripts->size; scriptenv++) {
+        if (scripts->scriptenv[scriptenv]->flags & SCRIPTS_F_NOEXEC) {
+            if (log) {
+                fprintf(log, ">>> Bypassing env (SCRIPTS_F_NOEXEC) \"%s\"\n", scripts->id[scriptenv]);
+            }
+            continue;
+        }
+
         const char *env = scripts->id[scriptenv];
 
         const char **all_scripts = (const char **) scripts->scriptenv[scriptenv]->script;
         const int total_scripts = (const int) scripts->scriptenv[scriptenv]->size;
-        const unsigned char flags = (const unsigned char) scripts->scriptenv[scriptenv]->flags;
+        unsigned char __flags = (const unsigned char) scripts->scriptenv[scriptenv]->flags;
+
+        if (__flags & SCRIPTS_F_NOEXEC) {
+            continue;
+        }
+
+        if (flags) {
+            __flags |= flags;
+            scripts->scriptenv[scriptenv]->flags = __flags;
+        }
 
         lua_State *state = scripts->scriptenv[scriptenv]->state;
         *l_state = state;
@@ -222,23 +238,29 @@ char *exec_all(
             }
         }
 
-        if (return_status.type != LUA_T_EMPTY) {
-            l_store_update(&return_status, state);
+        if (shared_status->type != LUA_T_EMPTY) {
+            l_store_update(shared_status, state);
         }
 
-        err = exec_scripts(log, all_scripts, total_scripts, state, flags, &return_status, cwd);
+        if (shared_status->type == LUA_T_STRING) {
+            if (log) {
+                fprintf(log, ">>> Carrying forward return_status = \"%s\"\n", shared_status->data.string);
+            }
+        }
+
+        err = exec_scripts(log, all_scripts, total_scripts, state, __flags, shared_status, cwd);
 
         if (err) {
             break;
         }
     }
 
-    if (return_status.type == LUA_T_STRING) {
-        free(return_status.data.string);
-        return_status.data.string = NULL;
-    }
+    // if (shared_status->type == LUA_T_STRING) {
+    //     free(shared_status->data.string);
+    //     shared_status->data.string = NULL;
+    // }
 
-    l_store_free(&return_status);
+    // l_store_free(shared_status);
 
     return err;
 }

@@ -18,6 +18,8 @@
 #define SCRIPTS_F_LUALIBS   0x02
 #define SCRIPTS_F_EXTLIBS   0x04
 #define SCRIPTS_F_SDLLIBS   0x08
+#define SCRIPTS_F_NOEXEC    0x10
+#define SCRIPTS_F_DEFUNCT   0x20
 
 typedef struct __scriptenv {
     char                    **script;
