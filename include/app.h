@@ -31,6 +31,8 @@ typedef struct __app        {
     SCRIPTS                 scripts;
     char                    **argv;
     int                     argc;
+    char                    *current_env;
+    char                    *current_script;
     SDL_Entity              **entity;
     int                     entities;
     SDL_Stacks              stacks;

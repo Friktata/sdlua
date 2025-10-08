@@ -1,4 +1,5 @@
 #include "../include/exec.h"
+#include "../include/app.h"
 
 /**
  *
@@ -59,7 +60,8 @@ char *exec_concurrent(
     const char              *path,
     lua_State               *state,
     const unsigned char     flags,
-    const char              *cwd
+    const char              *cwd,
+    const char              *env
 ) {
     static char err_msg[EXEC_ERR_LEN];
 
@@ -90,6 +92,16 @@ char *exec_concurrent(
         reg_sdl_cursor_types(state);
         reg_sdl_keycodes(state);
     }
+
+    APP *app = (APP *) (*(void **) lua_getextraspace(state));
+
+    app->current_env = (char *) env;
+    app->current_script = (char *) path;
+
+    lua_pushstring(state, app->current_env);
+    lua_setglobal(state, "__env");
+    lua_pushstring(state, app->current_script);
+    lua_setglobal(state, "__script");
 
     char *base_path = __get_script_directory(path);
     if (base_path) {
@@ -127,7 +139,8 @@ char *exec_scripts(
     lua_State               *state,
     const unsigned char     flags,
     LuaStore                *return_status,
-    const char              *cwd
+    const char              *cwd,
+    const char              *env
 ) {
     static char err_msg[EXEC_ERR_LEN];
     char *err = NULL;
@@ -146,7 +159,7 @@ char *exec_scripts(
     lua_settable(state, LUA_REGISTRYINDEX);
 
     for (int index = 0; index < scripts; index++) {
-        err = exec_concurrent(log, script[index], state, flags, cwd);
+        err = exec_concurrent(log, script[index], state, flags, cwd, env);
 
         if (err) {
             break;
@@ -248,19 +261,14 @@ char *exec_all(
             }
         }
 
-        err = exec_scripts(log, all_scripts, total_scripts, state, __flags, shared_status, cwd);
+        // env = scripts->id[scriptenv];
+
+        err = exec_scripts(log, all_scripts, total_scripts, state, __flags, shared_status, cwd, env);
 
         if (err) {
             break;
         }
     }
-
-    // if (shared_status->type == LUA_T_STRING) {
-    //     free(shared_status->data.string);
-    //     shared_status->data.string = NULL;
-    // }
-
-    // l_store_free(shared_status);
 
     return err;
 }

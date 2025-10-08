@@ -30,8 +30,8 @@
 
 #define EXEC_ERR_LEN            1024
 
-char        *exec_concurrent    (FILE *, const char *, lua_State *, unsigned char, const char *);
-char        *exec_scripts       (FILE *, const char **, const int, lua_State *, unsigned char, LuaStore *, const char *);
+char        *exec_concurrent    (FILE *, const char *, lua_State *, unsigned char, const char *, const char *);
+char        *exec_scripts       (FILE *, const char **, const int, lua_State *, unsigned char, LuaStore *, const char *, const char *);
 char        *exec_all           (FILE *, SCRIPTS *, lua_State **, unsigned char, LuaStore *);
 
 #endif

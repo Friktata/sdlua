@@ -32,6 +32,8 @@ int main(
     app.scripts = scripts_new(0);
     app.argv = NULL;
     app.argc = 0;
+    app.current_env = NULL;
+    app.current_script = NULL;
     app.entity = NULL;
     app.entities = 0;
     app.stacks.stack = NULL;
